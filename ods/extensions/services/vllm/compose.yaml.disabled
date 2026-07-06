@@ -1,0 +1,70 @@
+# vLLM — high-concurrency, OpenAI-compatible inference (NVIDIA-only, opt-in).
+#
+# DISABLED BY DEFAULT. This file is named compose.yaml.disabled so the compose
+# resolver does not auto-start it. Enable it (rename to compose.yaml, or toggle
+# from the dashboard Extensions page) only on a high-end NVIDIA host that needs
+# to serve many concurrent users/agents. vLLM runs ALONGSIDE llama-server, not
+# as a replacement — route to whichever backend fits the workload.
+#
+# Tunables mirror the validated launch recipe in docs/VLLM-SETUP.md. Override
+# any of them in .env; the defaults are the load-tested values from that doc.
+services:
+  vllm:
+    build:
+      context: ./extensions/services/vllm
+      dockerfile: Dockerfile
+    container_name: ods-vllm
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${VLLM_PORT:-8001}:8000"
+    volumes:
+      # Reuse the shared model directory read-only. VLLM_MODEL points at a model
+      # dir/file under /models (a dedicated env, decoupled from llama-server's
+      # GGUF-oriented LLM_MODEL selector — see open question in the proposal).
+      - ./data/models:/models:ro,z
+    # vLLM uses /dev/shm heavily for inter-process tensors; Docker's 64MB
+    # default hangs startup (docs/VLLM-SETUP.md).
+    shm_size: '8g'
+    command:
+      - --model
+      - "${VLLM_MODEL:-/models}"
+      - --served-model-name
+      - "${VLLM_SERVED_MODEL_NAME:-local-model}"
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --tensor-parallel-size
+      - "${VLLM_TENSOR_PARALLEL_SIZE:-1}"
+      - --max-model-len
+      - "${VLLM_MAX_MODEL_LEN:-65536}"
+      - --gpu-memory-utilization
+      - "${VLLM_GPU_MEMORY_UTILIZATION:-0.92}"
+      - --enable-chunked-prefill
+      - --enable-prefix-caching
+      - --max-num-batched-tokens
+      - "${VLLM_MAX_NUM_BATCHED_TOKENS:-8192}"
+      - --max-num-seqs
+      - "${VLLM_MAX_NUM_SEQS:-256}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${VLLM_GPU_COUNT:-1}
+              capabilities: [gpu]
+    healthcheck:
+      # /health 503s until weights load + CUDA graphs warm up (~90-120s), so
+      # give a generous start_period before the container is marked unhealthy.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -145,6 +145,12 @@
       "lan_exposure": "operator-controlled",
       "auth_required": false,
       "notes": "Speech-to-text model API; audio may be sensitive."
+    },
+    "vllm": {
+      "risk": "model-inference-api",
+      "lan_exposure": "operator-controlled",
+      "auth_required": false,
+      "notes": "Optional NVIDIA-only high-concurrency inference API; no built-in auth, keep local unless explicitly published."
     }
   }
 }
