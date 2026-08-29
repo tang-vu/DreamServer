@@ -167,6 +167,9 @@ test: ## Run unit and contract tests
 	@echo "=== CLI extension catalog discovery ==="
 	@bash tests/test-extension-catalog-cli.sh
 	@echo ""
+	@echo "=== CLI workflow catalog discovery ==="
+	@bash tests/test-workflow-catalog-cli.sh
+	@echo ""
 	@echo "=== session cleanup lifecycle ==="
 	@bash tests/test-session-cleanup.sh
 
