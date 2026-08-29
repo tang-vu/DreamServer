@@ -117,6 +117,7 @@ test: ## Run unit and contract tests
 	@echo "=== ods-update.sh backup command ==="
 	@bash tests/test-update-script-backup.sh
 	@bash tests/test-backup-integrity.sh
+	@bash tests/test-update-status-json.sh
 	@echo ""
 	@echo "=== bootstrap-upgrade spawn closes inherited FDs ==="
 	@bash tests/test-bootstrap-upgrade-close-inherited-fds.sh
