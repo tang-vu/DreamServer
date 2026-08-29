@@ -48,6 +48,7 @@ COMMANDS = {
     "doctor": ("cmd_doctor", "doctor [report|--json]"),
     "audit": ("cmd_audit", "audit [extensions]"),
     "catalog": ("cmd_catalog", "catalog [action]"),
+    "workflow": ("cmd_workflow", "workflow [action]"),
     "template": ("cmd_template", "template [action]"),
     "agent": ("cmd_agent", "agent [action]"),
 }
