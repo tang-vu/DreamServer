@@ -181,6 +181,9 @@ jobs:
       - name: AP Mode Activation Transaction Tests
         run: bash tests/test-ap-mode.sh
 
+      - name: Showcase Live Model Routing Tests
+        run: bash tests/test-showcase-live-model.sh
+
       - name: Validate Simulation Summary Tests
         run: bash tests/test-validate-sim-summary.sh
 

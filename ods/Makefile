@@ -76,6 +76,8 @@ test: ## Run unit and contract tests
 	@bash tests/test-zsh-completion.sh
 	@echo "=== AP mode activation transaction ==="
 	@bash tests/test-ap-mode.sh
+	@echo "=== Showcase live model routing ==="
+	@bash tests/test-showcase-live-model.sh
 	@echo ""
 	@echo "=== Bind address sweep ==="
 	@bash tests/test-bind-address-sweep.sh
