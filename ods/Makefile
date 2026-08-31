@@ -74,6 +74,8 @@ test: ## Run unit and contract tests
 	@bash tests/test-mode-switch-status.sh
 	@echo "=== Zsh CLI completion ==="
 	@bash tests/test-zsh-completion.sh
+	@echo "=== AP mode activation transaction ==="
+	@bash tests/test-ap-mode.sh
 	@echo ""
 	@echo "=== Bind address sweep ==="
 	@bash tests/test-bind-address-sweep.sh

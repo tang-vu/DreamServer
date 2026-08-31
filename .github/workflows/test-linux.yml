@@ -178,6 +178,9 @@ jobs:
       - name: Zsh Completion Contract Tests
         run: bash tests/test-zsh-completion.sh
 
+      - name: AP Mode Activation Transaction Tests
+        run: bash tests/test-ap-mode.sh
+
       - name: Validate Simulation Summary Tests
         run: bash tests/test-validate-sim-summary.sh
 
