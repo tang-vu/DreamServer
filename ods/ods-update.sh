@@ -889,7 +889,21 @@ cmd_changelog() {
         else
             log_warn "No local CHANGELOG.md found."
             log_info "Fetching latest release notes from GitHub..."
-            cmd_changelog "$(curl -sf --max-time 15 "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | jq -r '.tag_name // empty')" || true
+            local response latest_version
+            if ! response=$(curl -sf --max-time 15 "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" 2>/dev/null); then
+                log_error "Could not fetch latest release notes"
+                return 1
+            fi
+            if ! latest_version=$(printf '%s\n' "$response" | jq -r '.tag_name // empty' 2>/dev/null); then
+                log_error "Could not parse the latest release response"
+                return 1
+            fi
+            if [[ -z "$latest_version" ]]; then
+                log_error "Latest release response did not include a tag"
+                return 1
+            fi
+            log_info "Fetching changelog for version ${latest_version}..."
+            printf '%s\n' "$response" | jq -r '.body // "No changelog available."'
         fi
     fi
 }
