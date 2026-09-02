@@ -45,6 +45,7 @@ test: ## Run unit and contract tests
 	@bash tests/test-preflight-dashboard-port.sh
 	@bash tests/test-preflight-llm-container-identity.sh
 	@bash tests/test-functional-json-contract.sh
+	@bash tests/test-restore-large-archive-scan.sh
 	@echo ""
 	@echo "=== ods-doctor rootless subordinate IDs ==="
 	@bash tests/test-ods-doctor-rootless-subid.sh
