@@ -44,6 +44,7 @@ test: ## Run unit and contract tests
 	@bash tests/test-linux-host-agent-stop.sh
 	@bash tests/test-preflight-dashboard-port.sh
 	@bash tests/test-preflight-llm-container-identity.sh
+	@bash tests/test-functional-json-contract.sh
 	@echo ""
 	@echo "=== ods-doctor rootless subordinate IDs ==="
 	@bash tests/test-ods-doctor-rootless-subid.sh
