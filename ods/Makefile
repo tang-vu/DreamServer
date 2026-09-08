@@ -126,6 +126,7 @@ test: ## Run unit and contract tests
 	@bash tests/test-backup-data-coverage.sh
 	@python3 tests/test-milvus-persistence.py
 	@python3 tests/test-healthcheck-error-body.py
+	@python3 tests/test-provider-probe-redirects.py
 	@echo ""
 	@echo "=== backup integrity and restore round-trip ==="
 	@bash tests/test-backup-integrity.sh
