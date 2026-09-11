@@ -1,0 +1,13 @@
+[
+  {
+    "check": "actual browser quota partial save, second-tab receipt, reload, successful-save downgrade",
+    "fillers": 5061,
+    "error": "QuotaExceededError",
+    "currentVersion": 2,
+    "library": "old"
+  },
+  {
+    "check": "actual WebM decode, focus retains Blob URL, pause/resume, later selection wins import",
+    "browser": "148.0.7778.96"
+  }
+]

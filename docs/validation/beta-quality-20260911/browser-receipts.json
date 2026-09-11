@@ -1,0 +1,52 @@
+[
+  {
+    "check": "browser",
+    "version": "148.0.7778.96"
+  },
+  {
+    "check": "verified source layout/copy/download",
+    "width": 1280,
+    "before": {
+      "width": 734,
+      "scroll": 13395
+    },
+    "after": {
+      "width": 734,
+      "scroll": 734
+    },
+    "bytes": 2043
+  },
+  {
+    "check": "verified source layout/copy/download",
+    "width": 390,
+    "before": {
+      "width": 364,
+      "scroll": 13395
+    },
+    "after": {
+      "width": 364,
+      "scroll": 364
+    },
+    "bytes": 2043
+  },
+  {
+    "check": "actual iframe dimensions and retained execution",
+    "dimensions": [
+      1023,
+      900
+    ]
+  },
+  {
+    "check": "local file review and explicit insertion",
+    "bytes": 50
+  },
+  {
+    "check": "native prompt dialog and full-text filtering"
+  },
+  {
+    "check": "identity refresh preserves draft until explicit adoption"
+  },
+  {
+    "check": "native conversation search pagination and actual message focus"
+  }
+]
