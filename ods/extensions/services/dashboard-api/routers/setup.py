@@ -1,6 +1,7 @@
 """Setup wizard, persona management, and chat endpoints."""
 
 import asyncio
+import json
 import logging
 import os
 import re
