@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "readingPosition": {
+    "before": 300,
+    "after": 300,
+    "distance": 0
+  },
+  "csv": true,
+  "promptRoundTrip": true,
+  "diagnosticAllowlist": true,
+  "mobileBounds": true,
+  "errors": [],
+  "requests": [
+    "/api/pixel/chat/stream"
+  ]
+}

@@ -1,0 +1,30 @@
+import {fileURLToPath} from 'node:url'
+const OUT=fileURLToPath(new URL('.',import.meta.url)).replaceAll('\\','/').replace(/\/$/,'')
+const BASE_URL=process.env.BASE_URL || 'http://127.0.0.1:4319'
+import {chromium} from 'playwright'
+const browser=await chromium.launch({headless:true})
+const page=await browser.newPage({viewport:{width:1365,height:900}})
+await page.addInitScript(()=>{
+ const chat={schema:1,chatId:'smoke-organizer',messages:[{role:'user',content:'Review monthly budget'}]}
+ localStorage.setItem('ods.pixel.chat.v1',JSON.stringify(chat))
+ localStorage.setItem('ods.pixel.conversations.v1',JSON.stringify([chat]))
+})
+await page.route('**/api/**',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({available:true,model:'pixel/default',services:[],first_run:false})}))
+await page.goto(BASE_URL + '/')
+const row=page.getByRole('button',{name:'Review monthly budget',exact:true})
+await row.waitFor()
+await row.hover()
+const organize=page.getByRole('button',{name:'Organize chat: Review monthly budget'})
+const remove=page.getByRole('button',{name:'Delete chat: Review monthly budget'})
+const a=await organize.boundingBox(),b=await remove.boundingBox()
+if(a.x < b.x+b.width && b.x < a.x+a.width) throw new Error('Conversation actions overlap')
+const text=await row.locator('strong').boundingBox()
+console.log(JSON.stringify({organize:a,remove:b,text})); await page.screenshot({path:OUT + '/organizer-before.png'}); if(text.x < a.x+a.width && a.x < text.x+text.width) throw new Error('Organizer overlaps conversation title')
+await organize.click()
+await page.getByLabel('Conversation name').fill('Monthly budget')
+await page.getByLabel('Pin conversation').check()
+await page.getByRole('button',{name:'Save labels'}).click()
+await page.getByRole('button',{name:'Monthly budget',exact:true}).waitFor()
+await page.screenshot({path:OUT + '/organizer-desktop.png'})
+console.log('Organizer controls do not overlap; rename/pin works on actual dashboard route.')
+await browser.close()
