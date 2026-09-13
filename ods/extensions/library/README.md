@@ -86,6 +86,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 
 | Service | Description | GPU |
 |---------|------------|-----|
+| [`kiwix/`](services/kiwix/) | Kiwix — read and search local ZIM knowledge archives | CPU |
 | [`label-studio/`](services/label-studio/) | Label Studio — data labeling for ML training | CPU |
 | [`cyberchef/`](services/cyberchef/) | CyberChef — repeatable local data decoding and analysis recipes | CPU |
 | [`anythingllm/`](services/anythingllm/) | AnythingLLM — all-in-one RAG + chat + agents | AMD, NVIDIA |
@@ -116,6 +117,7 @@ Quick reference for hardware requirements. Data sourced from each service's `man
 | invokeai | ✓ | ✓ | — | — | 8 GB |
 | jan | ✓ | ✓ | — | — | — |
 | jupyter | ✓ | ✓ | — | — | 4 GB |
+| kiwix | ✓ | ✓ | ✓ | ✓ | — |
 | label-studio | — | — | — | ✓ | — |
 | langflow | ✓ | ✓ | ✓ | — | — |
 | librechat | ✓ | ✓ | ✓ | — | — |
