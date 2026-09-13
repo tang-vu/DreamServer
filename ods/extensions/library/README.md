@@ -1,6 +1,6 @@
 # ODS Extensions Library
 
-**35 service extensions being tested for ODS. 17 are already in production — these are next.**
+**36 service extensions being tested for ODS. 17 are already in production — these are next.**
 
 Each extension is a self-contained directory with a `manifest.yaml` (service metadata), `compose.yaml` (Docker Compose fragment), and optional Dockerfiles, workflows, and documentation. Drop any of these into your ODS's `extensions/services/` directory and run `ods enable <service-id>`.
 
@@ -76,6 +76,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`miniflux/`](services/miniflux/) | Miniflux — RSS/Atom reading and research API | CPU |
 | [`ntfy/`](services/ntfy/) | ntfy — authenticated local workflow notifications | CPU |
 | [`memos/`](services/memos/) | Memos — local Markdown notes and authenticated workflow API | CPU |
+| [`linkding/`](services/linkding/) | Linkding — private research bookmarks, tags and workflow API | CPU |
 | [`sillytavern/`](services/sillytavern/) | SillyTavern — advanced roleplay/chat frontend | AMD, NVIDIA, Apple |
 
 ### Data & ML
