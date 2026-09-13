@@ -75,6 +75,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`baserow/`](services/baserow/) | Baserow — open-source Airtable alternative | CPU |
 | [`miniflux/`](services/miniflux/) | Miniflux — RSS/Atom reading and research API | CPU |
 | [`ntfy/`](services/ntfy/) | ntfy — authenticated local workflow notifications | CPU |
+| [`memos/`](services/memos/) | Memos — local Markdown notes and authenticated workflow API | CPU |
 | [`sillytavern/`](services/sillytavern/) | SillyTavern — advanced roleplay/chat frontend | AMD, NVIDIA, Apple |
 
 ### Data & ML
