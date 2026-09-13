@@ -72,6 +72,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`pairdrop/`](services/pairdrop/) | PairDrop — direct browser file transfer with receiver consent | CPU |
 | [`paperless-ngx/`](services/paperless-ngx/) | Paperless-ngx — document management with OCR | CPU |
 | [`frigate/`](services/frigate/) | Frigate — NVR with real-time AI object detection | NVIDIA |
+| [`drawio/`](services/drawio/) | draw.io — local diagrams and browser SVG export | CPU |
 | [`gitea/`](services/gitea/) | Gitea — lightweight self-hosted Git | CPU |
 | [`it-tools/`](services/it-tools/) | IT-Tools — local browser utilities for text and data conversion | CPU |
 | [`baserow/`](services/baserow/) | Baserow — open-source Airtable alternative | CPU |
@@ -107,6 +108,7 @@ Quick reference for hardware requirements. Data sourced from each service's `man
 | crewai | — | — | — | ✓ | — |
 | cyberchef | — | — | — | ✓ | — |
 | dify | ✓ | ✓ | — | — | 4 GB |
+| drawio | ✓ | ✓ | ✓ | ✓ | — |
 | flowise | ✓ | ✓ | ✓ | — | — |
 | fooocus | ✓ | — | — | — | 8 GB |
 | forge | ✓ | — | — | — | 8 GB |
