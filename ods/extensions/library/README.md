@@ -78,6 +78,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`ntfy/`](services/ntfy/) | ntfy — authenticated local workflow notifications | CPU |
 | [`memos/`](services/memos/) | Memos — local Markdown notes and authenticated workflow API | CPU |
 | [`linkding/`](services/linkding/) | Linkding — private research bookmarks, tags and workflow API | CPU |
+| [`uptime-kuma/`](services/uptime-kuma/) | Uptime Kuma — authenticated service monitoring and local incident history | CPU |
 | [`sillytavern/`](services/sillytavern/) | SillyTavern — advanced roleplay/chat frontend | AMD, NVIDIA, Apple |
 
 ### Data & ML
