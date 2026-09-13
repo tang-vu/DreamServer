@@ -72,6 +72,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`paperless-ngx/`](services/paperless-ngx/) | Paperless-ngx — document management with OCR | CPU |
 | [`frigate/`](services/frigate/) | Frigate — NVR with real-time AI object detection | NVIDIA |
 | [`gitea/`](services/gitea/) | Gitea — lightweight self-hosted Git | CPU |
+| [`it-tools/`](services/it-tools/) | IT-Tools — local browser utilities for text and data conversion | CPU |
 | [`baserow/`](services/baserow/) | Baserow — open-source Airtable alternative | CPU |
 | [`miniflux/`](services/miniflux/) | Miniflux — RSS/Atom reading and research API | CPU |
 | [`ntfy/`](services/ntfy/) | ntfy — authenticated local workflow notifications | CPU |
