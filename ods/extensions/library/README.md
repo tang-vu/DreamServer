@@ -69,6 +69,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | Service | Description | GPU |
 |---------|------------|-----|
 | [`immich/`](services/immich/) | Immich — Google Photos alternative with AI face/object detection | AMD, NVIDIA |
+| [`pairdrop/`](services/pairdrop/) | PairDrop — direct browser file transfer with receiver consent | CPU |
 | [`paperless-ngx/`](services/paperless-ngx/) | Paperless-ngx — document management with OCR | CPU |
 | [`frigate/`](services/frigate/) | Frigate — NVR with real-time AI object detection | NVIDIA |
 | [`gitea/`](services/gitea/) | Gitea — lightweight self-hosted Git | CPU |
@@ -122,6 +123,7 @@ Quick reference for hardware requirements. Data sourced from each service's `man
 | milvus | — | — | — | ✓ | — |
 | ollama | ✓ | ✓ | — | — | 8 GB |
 | open-interpreter | — | — | — | ✓ | — |
+| pairdrop | ✓ | ✓ | ✓ | ✓ | — |
 | paperless-ngx | — | — | — | ✓ | — |
 | piper-audio | ✓ | ✓ | ✓ | — | — |
 | rvc | ✓ | ✓ | — | — | 6 GB |
