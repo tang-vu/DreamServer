@@ -1,6 +1,6 @@
 # ODS Extensions Library
 
-**44 service extensions being tested for ODS. 17 are already in production — these are next.**
+**45 service extensions being tested for ODS. 17 are already in production — these are next.**
 
 Each extension is a self-contained directory with a `manifest.yaml` (service metadata), `compose.yaml` (Docker Compose fragment), and optional Dockerfiles, workflows, and documentation. Drop any of these into your ODS's `extensions/services/` directory and run `ods enable <service-id>`.
 
@@ -83,6 +83,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`kroki/`](services/kroki/) | Kroki — local text-to-diagram rendering API | CPU |
 | [`syncthing/`](services/syncthing/) | Syncthing — continuous folder sync with explicit device pairing | CPU |
 | [`trilium/`](services/trilium/) | Trilium — hierarchical rich notes and authenticated knowledge API | CPU |
+| [`audiobookshelf/`](services/audiobookshelf/) | Audiobookshelf — local audio library and persistent listening progress | CPU |
 | [`sillytavern/`](services/sillytavern/) | SillyTavern — advanced roleplay/chat frontend | AMD, NVIDIA, Apple |
 
 ### Data & ML
