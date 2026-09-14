@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T14:26:07Z",
+  "generated_at": "2026-09-14T14:26:08Z",
   "schema_version": "1.0.0",
   "extensions": [
     {
@@ -4095,6 +4095,57 @@
         }
       },
       "catalog_source": "builtin",
+      "configuration_scope": "declared-environment-keys"
+    },
+    {
+      "id": "trilium",
+      "name": "Trilium",
+      "description": "Local hierarchical knowledge notebook with rich notes, attachments and an authenticated automation API.",
+      "category": "optional",
+      "gpu_backends": [
+        "all"
+      ],
+      "compose_file": "compose.yaml",
+      "depends_on": [],
+      "port": 8080,
+      "external_port_default": 7832,
+      "health_endpoint": "/api/health-check",
+      "env_vars": [
+        {
+          "key": "TRILIUM_PORT",
+          "default": "7832",
+          "description": "Published notebook port; complete the initial password setup locally"
+        }
+      ],
+      "tags": [
+        "notes",
+        "knowledge",
+        "research",
+        "local",
+        "api"
+      ],
+      "features": [
+        {
+          "id": "local-knowledge-notebook",
+          "name": "Local Knowledge Notebook",
+          "description": "Organize research into rich note trees and use the authenticated ETAPI",
+          "icon": "NotebookPen",
+          "category": "productivity",
+          "requirements": {
+            "services": [
+              "trilium"
+            ],
+            "vram_gb": 0,
+            "disk_gb": 1
+          },
+          "enabled_services_all": [
+            "trilium"
+          ],
+          "setup_time": "~2 minutes",
+          "priority": 32
+        }
+      ],
+      "startup_timeout": 120,
       "configuration_scope": "declared-environment-keys"
     },
     {
