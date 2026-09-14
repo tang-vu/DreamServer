@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T14:19:57Z",
+  "generated_at": "2026-09-14T14:20:50Z",
   "schema_version": "1.0.0",
   "extensions": [
     {
@@ -2915,6 +2915,59 @@
         }
       },
       "catalog_source": "builtin",
+      "configuration_scope": "declared-environment-keys"
+    },
+    {
+      "id": "openspeedtest",
+      "name": "OpenSpeedTest",
+      "description": "Measure browser-to-ODS network throughput with a local test server.",
+      "category": "optional",
+      "gpu_backends": [
+        "all"
+      ],
+      "compose_file": "compose.yaml",
+      "depends_on": [],
+      "port": 3000,
+      "external_port_default": 7825,
+      "health_endpoint": "/",
+      "env_vars": [
+        {
+          "key": "OPENSPEEDTEST_PORT",
+          "default": "7825",
+          "description": "Published port for the local network speed test"
+        }
+      ],
+      "tags": [
+        "network",
+        "diagnostics",
+        "local"
+      ],
+      "features": [
+        {
+          "id": "local-network-speedtest",
+          "name": "Network Speed Test",
+          "description": "Estimate upload, download and latency between your browser and ODS",
+          "icon": "Activity",
+          "category": "productivity",
+          "requirements": {
+            "services": [
+              "openspeedtest"
+            ],
+            "vram_gb": 0,
+            "disk_gb": 1
+          },
+          "enabled_services_all": [
+            "openspeedtest"
+          ],
+          "setup_time": "~1-2 minutes",
+          "priority": 32,
+          "launch": {
+            "type": "service",
+            "service": "openspeedtest"
+          }
+        }
+      ],
+      "startup_timeout": 120,
       "configuration_scope": "declared-environment-keys"
     },
     {
