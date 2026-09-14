@@ -63,6 +63,7 @@ test: ## Run unit and contract tests
 	@python3 tests/test-audiocraft-compose.py
 	@python3 tests/test-cli-stt-env.py
 	@python3 tests/test-cli-stt-transcribe.py
+	@python3 tests/test-cli-tts.py
 	@echo ""
 	@echo "=== AMD/Lemonade contracts ==="
 	@bash tests/contracts/test-amd-lemonade-contracts.sh
