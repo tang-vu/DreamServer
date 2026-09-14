@@ -140,6 +140,7 @@ test: ## Run unit and contract tests
 	@python3 tests/test-langflow-persistence-env.py
 	@python3 tests/test-crewai-persistence-env.py
 	@python3 tests/test-aider-launcher.py
+	@python3 tests/test-text-generation-api-port.py
 	@echo ""
 	@echo "=== macOS ods config show secret-mask ==="
 	@bash tests/test-macos-config-show-secret-mask.sh
