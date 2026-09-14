@@ -1074,6 +1074,8 @@ function DetailModal({ ext, gpuBackend, onClose }) {
 function ConsoleModal({ ext, onClose }) {
   const [logs, setLogs] = useState('')
   const [loading, setLoading] = useState(true)
+  const [fetchingLogs, setFetchingLogs] = useState(false)
+  const logRequestInFlight = useRef(false)
   const [error, setError] = useState(null)
   const [disconnected, setDisconnected] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
@@ -1119,6 +1121,12 @@ function ConsoleModal({ ext, onClose }) {
 
     const poll = async () => {
       if (!active) return
+      if (logRequestInFlight.current) {
+        setTimeout(poll, 2000)
+        return
+      }
+      logRequestInFlight.current = true
+      setFetchingLogs(true)
       try {
         const res = await fetch(`/api/extensions/${ext.id}/logs`, {
           method: 'POST',
@@ -1139,6 +1147,8 @@ function ConsoleModal({ ext, onClose }) {
         setError(err.message)
       } finally {
         setLoading(false)
+        logRequestInFlight.current = false
+        setFetchingLogs(false)
       }
       if (active) {
         const delay = failCount > 0 ? Math.min(2000 * Math.pow(2, failCount - 1), 30000) : 2000
@@ -1173,6 +1183,9 @@ function ConsoleModal({ ext, onClose }) {
   }
 
   const fetchLogsOnce = async () => {
+    if (logRequestInFlight.current) return
+    logRequestInFlight.current = true
+    setFetchingLogs(true)
     try {
       const res = await fetch(`/api/extensions/${ext.id}/logs`, {
         method: 'POST',
@@ -1188,6 +1201,9 @@ function ConsoleModal({ ext, onClose }) {
       setDisconnected(false)
     } catch (err) {
       setError(err.message)
+    } finally {
+      logRequestInFlight.current = false
+      setFetchingLogs(false)
     }
   }
 
@@ -1270,7 +1286,7 @@ function ConsoleModal({ ext, onClose }) {
           <span className={`text-[10px] ${disconnected ? 'text-red-400' : 'text-theme-text-muted'}`}>
             {disconnected ? 'Reconnecting...' : 'Auto-refreshing every 2s'}
           </span>
-          <button onClick={fetchLogsOnce} className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors" title="Refresh now">
+          <button onClick={fetchLogsOnce} disabled={fetchingLogs} className="text-xs text-theme-text-muted hover:text-theme-text-secondary transition-colors disabled:opacity-50" title="Refresh now">
             <RefreshCw size={12} />
           </button>
         </div>
