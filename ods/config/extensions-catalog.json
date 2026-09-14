@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T14:20:56Z",
+  "generated_at": "2026-09-14T14:20:57Z",
   "schema_version": "1.0.0",
   "extensions": [
     {
@@ -2015,6 +2015,57 @@
         }
       ],
       "catalog_source": "builtin",
+      "configuration_scope": "declared-environment-keys"
+    },
+    {
+      "id": "languagetool",
+      "name": "LanguageTool",
+      "description": "Local spelling and grammar checks for writing tools and automation.",
+      "category": "optional",
+      "gpu_backends": [
+        "all"
+      ],
+      "compose_file": "compose.yaml",
+      "depends_on": [],
+      "port": 8081,
+      "external_port_default": 7826,
+      "health_endpoint": "/v2/languages",
+      "env_vars": [
+        {
+          "key": "LANGUAGETOOL_PORT",
+          "default": "7826",
+          "description": "Published port for the local LanguageTool HTTP API"
+        }
+      ],
+      "tags": [
+        "writing",
+        "grammar",
+        "spelling",
+        "local",
+        "api"
+      ],
+      "features": [
+        {
+          "id": "local-proofreading",
+          "name": "Local Proofreading API",
+          "description": "Check spelling and grammar using local dictionaries and rules",
+          "icon": "FileText",
+          "category": "productivity",
+          "requirements": {
+            "services": [
+              "languagetool"
+            ],
+            "vram_gb": 0,
+            "disk_gb": 3
+          },
+          "enabled_services_all": [
+            "languagetool"
+          ],
+          "setup_time": "~2-5 minutes",
+          "priority": 32
+        }
+      ],
+      "startup_timeout": 300,
       "configuration_scope": "declared-environment-keys"
     },
     {
