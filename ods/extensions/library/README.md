@@ -1,6 +1,6 @@
 # ODS Extensions Library
 
-**41 service extensions being tested for ODS. 17 are already in production — these are next.**
+**42 service extensions being tested for ODS. 17 are already in production — these are next.**
 
 Each extension is a self-contained directory with a `manifest.yaml` (service metadata), `compose.yaml` (Docker Compose fragment), and optional Dockerfiles, workflows, and documentation. Drop any of these into your ODS's `extensions/services/` directory and run `ods enable <service-id>`.
 
@@ -80,6 +80,7 @@ Each extension is a self-contained directory with a `manifest.yaml` (service met
 | [`languagetool/`](services/languagetool/) | LanguageTool — local spelling and grammar API | CPU |
 | [`ntfy/`](services/ntfy/) | ntfy — authenticated local workflow notifications | CPU |
 | [`sftpgo/`](services/sftpgo/) | SFTPGo — authenticated dataset/artifact transfer workspace | CPU |
+| [`kroki/`](services/kroki/) | Kroki — local text-to-diagram rendering API | CPU |
 | [`sillytavern/`](services/sillytavern/) | SillyTavern — advanced roleplay/chat frontend | AMD, NVIDIA, Apple |
 
 ### Data & ML
