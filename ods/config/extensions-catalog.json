@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T14:20:50Z",
+  "generated_at": "2026-09-14T14:20:56Z",
   "schema_version": "1.0.0",
   "extensions": [
     {
@@ -1253,6 +1253,7 @@
           ]
         }
       ],
+      "ui_scheme": "https",
       "configuration_scope": "declared-environment-keys"
     },
     {
