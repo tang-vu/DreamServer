@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T14:26:10Z",
+  "generated_at": "2026-09-14T14:26:11Z",
   "schema_version": "1.0.0",
   "extensions": [
     {
@@ -2642,6 +2642,61 @@
           "priority": 9
         }
       ],
+      "configuration_scope": "declared-environment-keys"
+    },
+    {
+      "id": "mealie",
+      "name": "Mealie",
+      "description": "Store local recipes and plan household meals through an authenticated API.",
+      "category": "optional",
+      "gpu_backends": [
+        "all"
+      ],
+      "compose_file": "compose.yaml",
+      "depends_on": [],
+      "port": 9000,
+      "external_port_default": 7835,
+      "health_endpoint": "/api/app/about",
+      "env_vars": [
+        {
+          "key": "MEALIE_PORT",
+          "default": "7835",
+          "description": "Published recipe port; change the upstream initial password locally"
+        },
+        {
+          "key": "MEALIE_BASE_URL",
+          "default": "http://localhost:7835",
+          "description": "Public browser URL used in notifications; update when changing the port"
+        }
+      ],
+      "tags": [
+        "recipes",
+        "household",
+        "planning",
+        "local"
+      ],
+      "features": [
+        {
+          "id": "recipe-meal-planning",
+          "name": "Recipes and Meal Planning",
+          "description": "Keep recipes and their scheduled meals in a local household library",
+          "icon": "Utensils",
+          "category": "productivity",
+          "requirements": {
+            "services": [
+              "mealie"
+            ],
+            "vram_gb": 0,
+            "disk_gb": 2
+          },
+          "enabled_services_all": [
+            "mealie"
+          ],
+          "setup_time": "~3 minutes",
+          "priority": 33
+        }
+      ],
+      "startup_timeout": 180,
       "configuration_scope": "declared-environment-keys"
     },
     {
