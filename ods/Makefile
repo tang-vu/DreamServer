@@ -62,6 +62,7 @@ test: ## Run unit and contract tests
 	@bash tests/test-cli-status-docker-error.sh
 	@python3 tests/test-audiocraft-compose.py
 	@python3 tests/test-cli-stt-env.py
+	@python3 tests/test-cli-stt-transcribe.py
 	@echo ""
 	@echo "=== AMD/Lemonade contracts ==="
 	@bash tests/contracts/test-amd-lemonade-contracts.sh
