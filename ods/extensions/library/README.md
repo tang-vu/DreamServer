@@ -234,3 +234,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Metabase (Local SQL Analytics)
 
 [Metabase (Local SQL Analytics)](services/metabase/README.md) — Save SQL questions and build reports over explicitly connected local databases, with a dedicated application store.
+
+### Mosquitto (MQTT Events)
+
+[Mosquitto (MQTT Events)](services/mosquitto/README.md) — Exchange local sensor and workflow events over MQTT 5 or native MQTT WebSockets with separate publisher and reader credentials.
