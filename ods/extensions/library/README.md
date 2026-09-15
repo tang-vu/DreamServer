@@ -230,3 +230,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Jaeger (Distributed Tracing)
 
 [Jaeger (Distributed Tracing)](services/jaeger/README.md) — Inspect authenticated OTLP traces across local workflow services with retained span history.
+
+### Metabase (Local SQL Analytics)
+
+[Metabase (Local SQL Analytics)](services/metabase/README.md) — Save SQL questions and build reports over explicitly connected local databases, with a dedicated application store.
