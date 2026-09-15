@@ -254,3 +254,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Node-RED (Local Event Flows)
 
 [Node-RED (Local Event Flows)](services/nodered/README.md) — Deploy event-driven flows with separate native editor and HTTP-node authentication.
+
+### Dagu (Local YAML Jobs)
+
+[Dagu (Local YAML Jobs)](services/dagu/README.md) — Run native YAML job dependencies locally with authenticated run receipts and persisted history.
