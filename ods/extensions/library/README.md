@@ -242,3 +242,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Trino (Federated SQL)
 
 [Trino (Federated SQL)](services/trino/README.md) — Query explicitly configured local data sources through one read-only SQL endpoint with native HTTPS and password authentication.
+
+### Redpanda (Kafka Event Log)
+
+[Redpanda (Kafka Event Log)](services/redpanda/README.md) — Retain and replay local workflow events through the Kafka API with SCRAM authentication and native topic/group ACLs.
