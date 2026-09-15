@@ -214,3 +214,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### WireMock (Local API Fixtures)
 
 [WireMock (Local API Fixtures)](services/wiremock/README.md) — Reproduce HTTP responses and failure cases locally with persistent fixtures and authenticated administration.
+
+### QuestDB (Time-Series SQL)
+
+[QuestDB (Time-Series SQL)](services/questdb/README.md) — Ingest timestamped workflow events through authenticated HTTP and query them with time-series SQL.
