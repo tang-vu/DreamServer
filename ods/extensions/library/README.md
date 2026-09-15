@@ -238,3 +238,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Mosquitto (MQTT Events)
 
 [Mosquitto (MQTT Events)](services/mosquitto/README.md) — Exchange local sensor and workflow events over MQTT 5 or native MQTT WebSockets with separate publisher and reader credentials.
+
+### Trino (Federated SQL)
+
+[Trino (Federated SQL)](services/trino/README.md) — Query explicitly configured local data sources through one read-only SQL endpoint with native HTTPS and password authentication.
