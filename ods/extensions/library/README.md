@@ -250,3 +250,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### NocoDB (Local Structured Tables)
 
 [NocoDB (Local Structured Tables)](services/nocodb/README.md) — Edit structured local tables in a browser and expose authenticated row APIs to workflows.
+
+### Node-RED (Local Event Flows)
+
+[Node-RED (Local Event Flows)](services/nodered/README.md) — Deploy event-driven flows with separate native editor and HTTP-node authentication.
