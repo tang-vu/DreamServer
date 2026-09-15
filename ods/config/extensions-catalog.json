@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T07:14:12Z",
+  "generated_at": "2026-09-15T02:35:05Z",
   "schema_version": "1.0.0",
   "extensions": [
     {
@@ -3766,28 +3766,6 @@
           ]
         }
       ],
-      "catalog_source": "builtin",
-      "configuration_scope": "declared-environment-keys"
-    },
-    {
-      "id": "pixel-inference",
-      "name": "Pixel inference sharing (development)",
-      "description": "Disabled by default. Owner-provisioned, inference-only device credentials; loopback transport only. Does not provide Pixel agent or computer access. Private state must be provisioned before service activation. Native Windows private-state support and guided setup are not yet implemented.",
-      "category": "optional",
-      "gpu_backends": [
-        "all"
-      ],
-      "compose_file": "compose.yaml",
-      "depends_on": [
-        "model-router"
-      ],
-      "port": 8093,
-      "external_port_default": 4005,
-      "health_endpoint": "/health",
-      "env_vars": [],
-      "tags": [],
-      "features": [],
-      "startup_check": false,
       "catalog_source": "builtin",
       "configuration_scope": "declared-environment-keys"
     },
