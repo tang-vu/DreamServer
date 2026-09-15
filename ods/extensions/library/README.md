@@ -258,3 +258,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Dagu (Local YAML Jobs)
 
 [Dagu (Local YAML Jobs)](services/dagu/README.md) — Run native YAML job dependencies locally with authenticated run receipts and persisted history.
+
+### Garage (Local Object Artifacts)
+
+[Garage (Local Object Artifacts)](services/garage/README.md) — Store reproducible local artifacts through S3 with Garage's native single-node layout and bucket permissions.
