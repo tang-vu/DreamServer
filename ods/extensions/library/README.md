@@ -262,3 +262,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Garage (Local Object Artifacts)
 
 [Garage (Local Object Artifacts)](services/garage/README.md) — Store reproducible local artifacts through S3 with Garage's native single-node layout and bucket permissions.
+
+### Loki (Local LogQL)
+
+[Loki (Local LogQL)](services/loki/README.md) — Ingest and query local logs through a credential-separated LogQL gateway and persistent single-node Loki.
