@@ -226,3 +226,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Dolt (Versioned Datasets)
 
 [Dolt (Versioned Datasets)](services/dolt/README.md) — Use MySQL-compatible SQL with native commits, branches, and historical queries for local evaluation datasets.
+
+### Jaeger (Distributed Tracing)
+
+[Jaeger (Distributed Tracing)](services/jaeger/README.md) — Inspect authenticated OTLP traces across local workflow services with retained span history.
