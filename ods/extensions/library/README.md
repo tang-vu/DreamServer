@@ -210,3 +210,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Local work queues
 
 [RabbitMQ](services/rabbitmq/README.md) supplies authenticated AMQP queues with a native management console. Enable it explicitly and configure your workers; it does not change ODS chat routing.
+
+### WireMock (Local API Fixtures)
+
+[WireMock (Local API Fixtures)](services/wiremock/README.md) — Reproduce HTTP responses and failure cases locally with persistent fixtures and authenticated administration.
