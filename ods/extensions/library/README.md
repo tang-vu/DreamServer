@@ -266,3 +266,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Loki (Local LogQL)
 
 [Loki (Local LogQL)](services/loki/README.md) — Ingest and query local logs through a credential-separated LogQL gateway and persistent single-node Loki.
+
+### Apprise (Fixed Notification Routes)
+
+[Apprise (Fixed Notification Routes)](services/apprise/README.md) — Deliver workflow notifications to operator-configured native Apprise targets through an authenticated fixed-route API.
