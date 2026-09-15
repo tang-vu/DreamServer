@@ -270,3 +270,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Apprise (Fixed Notification Routes)
 
 [Apprise (Fixed Notification Routes)](services/apprise/README.md) — Deliver workflow notifications to operator-configured native Apprise targets through an authenticated fixed-route API.
+
+### PostgREST (Workflow Artifact API)
+
+[PostgREST (Workflow Artifact API)](services/postgrest/README.md) — Expose structured local workflow artifacts through native PostgREST filters, transactions and PostgreSQL reader/writer grants.
