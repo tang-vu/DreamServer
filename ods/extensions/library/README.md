@@ -222,3 +222,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### InfluxDB (Flux Workflows)
 
 [InfluxDB (Flux Workflows)](services/influxdb/README.md) — Store local workflow measurements in scoped buckets and query them with the InfluxDB v2 API and Flux.
+
+### Dolt (Versioned Datasets)
+
+[Dolt (Versioned Datasets)](services/dolt/README.md) — Use MySQL-compatible SQL with native commits, branches, and historical queries for local evaluation datasets.
