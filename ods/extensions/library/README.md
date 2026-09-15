@@ -246,3 +246,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### Redpanda (Kafka Event Log)
 
 [Redpanda (Kafka Event Log)](services/redpanda/README.md) — Retain and replay local workflow events through the Kafka API with SCRAM authentication and native topic/group ACLs.
+
+### NocoDB (Local Structured Tables)
+
+[NocoDB (Local Structured Tables)](services/nocodb/README.md) — Edit structured local tables in a browser and expose authenticated row APIs to workflows.
