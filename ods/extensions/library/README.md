@@ -218,3 +218,7 @@ These extensions are actively tested on ODS development builds. Some are battle-
 ### QuestDB (Time-Series SQL)
 
 [QuestDB (Time-Series SQL)](services/questdb/README.md) — Ingest timestamped workflow events through authenticated HTTP and query them with time-series SQL.
+
+### InfluxDB (Flux Workflows)
+
+[InfluxDB (Flux Workflows)](services/influxdb/README.md) — Store local workflow measurements in scoped buckets and query them with the InfluxDB v2 API and Flux.
