@@ -9,7 +9,7 @@ human review and the per-PR live gates remain required.
 - Comparison base: `33155fb5c4a99242b6fa8eb6e2d9b108c869e3cc`. The integration includes every exact candidate in the table.
 - Host: WSL Ubuntu Linux/amd64, Docker Desktop 29.5.3, Docker Compose 5.1.4,
   Python 3.11.16. UI tests use jsdom; this is not a native browser or hardware fleet qualification.
-- GitHub check snapshot: `2026-09-15T08:23:09.9143334+00:00`. Current status can change after this receipt.
+- GitHub check snapshot: `2026-09-15T08:28:06.7269998+00:00`. Current status can change after this receipt.
 - Branch: `integration/beta-quality40-20260915`. Documentation added after the tested code head does not change the tested production tree.
 
 ## Combined validation
@@ -20,7 +20,8 @@ human review and the per-PR live gates remain required.
 | Dashboard: `npm run lint`, `npm run build`, `npm test -- --maxWorkers=2` | Lint/build passed; 1,134 tests in 146 files passed; tests 216.86 seconds | Combined React behavior and production compilation; not a browser save dialog or live hardware data. |
 | All 23 changed `ods/tests/test_*.py` files, `python -m pytest ... -q --tb=short` | 247 passed; 28 opt-in skips; 186.40 seconds | Rendered extension plans, public-boundary fixtures and offline contract tests. Native lifecycle evidence is separate below and in each PR. |
 | Every command in the Makefile `test` target, each executed even after a failure | 84 of 87 suites passed | Includes the repository-wide BIND_ADDRESS sweep. Three failing suites also fail at the unchanged base on this host. |
-| `make smoke` and `make simulate` | Passed on the final code head | Four platform-selection smoke paths and simulated installation; not four native hardware executions. |
+| `make smoke` | Four platform-selection paths passed on the final code head | Selection and fixture contracts; not four native hardware executions. |
+| `make simulate` | Wrapper exit 0; artifact 3/4 golden paths passed | Linux NVIDIA dry-run exits 1 at the root-user guard. The exact base reproduces the same artifact failure. This is not a full simulation pass. |
 | `make bats` on the initial all-40 integration and unchanged base | 416 of 421 passed on both; same five named failures | Root/WSL limitations reproduced. Binding follow-ups change recipe publication/docs/tests only; BATS was not repeated after those follow-ups. |
 | Repository-wide pre-commit hooks | Gitleaks, large-file and ShellCheck passed; private-key hook flags two existing test-marker files | All touched-file hooks passed. Full hooks are not reported green. Marker findings were reproduced on the unchanged base. |
 
@@ -42,6 +43,14 @@ fixtures. Full private-key scanning flags pre-existing marker strings in
 `ods/extensions/services/dashboard-api/tests/test_host_agent.py`; their matching
 marker lines and the hook failure were checked at the base. No tests were weakened
 or excluded to manufacture a green gate.
+
+**Simulation receipt correction:** the initial report treated the wrapper's zero
+exit as a pass. Inspection of `artifacts/installer-sim/summary.json` and
+`golden-paths.json` shows Linux NVIDIA failed before capability/preflight signals
+because the installer refuses root. Running `make simulate` at the unchanged
+base produced the same 3/4 result and Linux exit 1. This explicit artifact result
+supersedes earlier simulation-pass wording; no successful Linux installation is
+claimed. The wrapper's failure-propagation behavior is outside these 40 scopes.
 
 ## Binding regression found during integration
 

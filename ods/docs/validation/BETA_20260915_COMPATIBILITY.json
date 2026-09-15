@@ -1,7 +1,7 @@
 {
   "tested_code_head": "a72e15781e4f41c3bd81f3b7f27f5b0fc5503a63",
   "base": "33155fb5c4a99242b6fa8eb6e2d9b108c869e3cc",
-  "snapshot": "2026-09-15T08:23:09.9143334+00:00",
+  "snapshot": "2026-09-15T08:28:06.7269998+00:00",
   "commands": {
     "integration40-final-api": {
       "command": [
@@ -10564,5 +10564,71 @@
         }
       ]
     }
-  ]
+  ],
+  "simulation_artifacts": {
+    "candidate": {
+      "generated_at": "2026-09-15T08:19:13.893877+00:00",
+      "linux_dryrun_exit_code": 1,
+      "linux_dryrun_signals": {
+        "capability_loaded": false,
+        "hardware_class_logged": false,
+        "backend_contract_loaded": false,
+        "preflight_report_logged": false,
+        "compose_selection_logged": false
+      },
+      "scenario_count": 4,
+      "pass_count": 3,
+      "scenarios": [
+        {
+          "id": "linux-nvidia",
+          "status": "fail"
+        },
+        {
+          "id": "windows-wsl2-nvidia",
+          "status": "pass"
+        },
+        {
+          "id": "windows-wsl2-amd-lemonade",
+          "status": "pass"
+        },
+        {
+          "id": "apple-silicon",
+          "status": "pass"
+        }
+      ],
+      "linux_failure": "Installer refuses execution as root before capability/preflight signals."
+    },
+    "baseline": {
+      "generated_at": "2026-09-15T08:28:03.538747+00:00",
+      "linux_dryrun_exit_code": 1,
+      "linux_dryrun_signals": {
+        "capability_loaded": false,
+        "hardware_class_logged": false,
+        "backend_contract_loaded": false,
+        "preflight_report_logged": false,
+        "compose_selection_logged": false
+      },
+      "scenario_count": 4,
+      "pass_count": 3,
+      "scenarios": [
+        {
+          "id": "linux-nvidia",
+          "status": "fail"
+        },
+        {
+          "id": "windows-wsl2-nvidia",
+          "status": "pass"
+        },
+        {
+          "id": "windows-wsl2-amd-lemonade",
+          "status": "pass"
+        },
+        {
+          "id": "apple-silicon",
+          "status": "pass"
+        }
+      ],
+      "linux_failure": "Installer refuses execution as root before capability/preflight signals."
+    }
+  }
 }
