@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { render } from '../../test/test-utils'
 import Sidebar from '../Sidebar' // eslint-disable-line no-unused-vars
 import { getSidebarExternalLinks } from '../../plugins/registry'
@@ -23,6 +23,7 @@ describe('Sidebar', () => {
   }
 
   beforeEach(() => {
+    getSidebarExternalLinks.mockReturnValue([])
     vi.stubGlobal('fetch', vi.fn(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
     ))
@@ -84,5 +85,37 @@ describe('Sidebar', () => {
     expect(screen.getByText('OpenCode')).toBeInTheDocument()
     expect(screen.getByText('Offline')).toBeInTheDocument()
     expect(screen.getByText('OpenCode').closest('a')).not.toHaveAttribute('href')
+  })
+
+  test.each([
+    ['https://ods.example.test/openclaw?view=chat#recent', 'https://ods.example.test/openclaw?view=chat&token=a%2Bb%2Fc%3F#recent'],
+    ['https://ods.example.test/openclaw?token=old&view=chat#recent', 'https://ods.example.test/openclaw?token=a%2Bb%2Fc%3F&view=chat#recent'],
+    ['/openclaw?view=chat#recent', `${window.location.origin}/openclaw?view=chat&token=a%2Bb%2Fc%3F#recent`],
+  ])('preserves OpenClaw URL state and encodes the token for %s', async (rawUrl, expected) => {
+    getSidebarExternalLinks.mockReturnValue([
+      {
+        key: 'openclaw',
+        url: rawUrl,
+        icon: () => <span data-testid="openclaw-icon">OC</span>,
+        label: 'OpenClaw',
+        healthy: true,
+      },
+    ])
+    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(
+        url === '/api/service-tokens' ? { openclaw: 'a+b/c?' } : [],
+      ),
+    })))
+
+    render(<Sidebar status={defaultStatus} collapsed={false} onToggle={() => {}} />)
+
+    const link = screen.getByText('OpenClaw').closest('a')
+    await waitFor(() => {
+      expect(link).toHaveAttribute(
+        'href',
+        expected,
+      )
+    })
   })
 })
