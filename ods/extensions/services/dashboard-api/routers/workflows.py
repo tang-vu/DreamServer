@@ -7,7 +7,6 @@ import re
 
 import aiohttp
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
 
 from config import (
     SERVICES, WORKFLOW_DIR, WORKFLOW_CATALOG_FILE,
@@ -49,26 +48,6 @@ def load_workflow_catalog() -> dict:
         return DEFAULT_WORKFLOW_CATALOG
 
 
-async def _read_workflow_pages(session, headers: dict) -> list[dict]:
-    workflows = []
-    params = {}
-    seen_cursors = set()
-    while True:
-        async with session.get(f"{N8N_URL}/api/v1/workflows", headers=headers, params=params) as resp:
-            if resp.status != 200:
-                logger.warning("Failed to fetch n8n workflow page: HTTP %s", resp.status)
-                return []
-            data = await resp.json()
-        workflows.extend(data.get("data", []))
-        cursor = data.get("nextCursor")
-        if not cursor:
-            return workflows
-        if not isinstance(cursor, str) or cursor in seen_cursors:
-            raise HTTPException(status_code=502, detail="n8n returned an invalid or repeated workflow cursor")
-        seen_cursors.add(cursor)
-        params = {"cursor": cursor}
-
-
 async def get_n8n_workflows() -> list[dict]:
     """Get all workflows from n8n API."""
     try:
@@ -76,10 +55,11 @@ async def get_n8n_workflows() -> list[dict]:
         if N8N_API_KEY:
             headers["X-N8N-API-KEY"] = N8N_API_KEY
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
-            # Bound the complete traversal, not just each individual page.
-            async with asyncio.timeout(5):
-                return await _read_workflow_pages(session, headers)
-    except (aiohttp.ClientError, OSError, asyncio.TimeoutError, json.JSONDecodeError) as e:
+            async with session.get(f"{N8N_URL}/api/v1/workflows", headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("data", [])
+    except (aiohttp.ClientError, OSError, json.JSONDecodeError) as e:
         logger.warning(f"Failed to fetch workflows from n8n: {e}")
     return []
 
@@ -118,32 +98,6 @@ async def check_n8n_available() -> bool:
 
 
 # --- Endpoints ---
-
-@router.get("/api/workflows/n8n/{n8n_id}/export")
-async def export_installed_workflow(n8n_id: str, api_key: str = Depends(verify_api_key)):
-    """Export an installed n8n workflow's portable definition without modifying it."""
-    _validate_workflow_id(n8n_id)
-    headers = {"X-N8N-API-KEY": N8N_API_KEY} if N8N_API_KEY else {}
-    try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            async with session.get(f"{N8N_URL}/api/v1/workflows/{n8n_id}", headers=headers, params={"excludePinnedData": "true"}, allow_redirects=False) as response:
-                if response.status == 404:
-                    raise HTTPException(status_code=404, detail="Installed workflow not found")
-                if response.status != 200:
-                    raise HTTPException(status_code=502, detail="n8n could not export the workflow")
-                workflow = await response.json()
-    except asyncio.TimeoutError as exc:
-        raise HTTPException(status_code=504, detail="n8n workflow export timed out") from exc
-    except (aiohttp.ClientError, OSError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=502, detail="n8n workflow export unavailable") from exc
-    if not isinstance(workflow, dict) or not isinstance(workflow.get("name"), str) or not isinstance(workflow.get("nodes"), list) or not isinstance(workflow.get("connections"), dict) or not isinstance(workflow.get("settings", {}), dict):
-        raise HTTPException(status_code=502, detail="n8n returned an invalid workflow definition")
-    portable = {key: workflow[key] for key in ("name", "nodes", "connections")}
-    portable["settings"] = workflow.get("settings", {})
-    return JSONResponse(portable, headers={
-        "Content-Disposition": f'attachment; filename="ods-workflow-{n8n_id}.json"',
-        "Cache-Control": "no-store",
-    })
 
 @router.get("/api/workflows/categories")
 async def api_workflow_categories(api_key: str = Depends(verify_api_key)):

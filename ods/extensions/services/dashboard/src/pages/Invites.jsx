@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import './invites.css'
 import {
   UserPlus, Copy, Check, Trash2, RefreshCw, QrCode, Share2, X,
-  Loader2, AlertCircle, Clock, Users, KeyRound, ShieldCheck, Mic2,
+  Loader2, AlertCircle, Clock, KeyRound, Mic2,
   Printer, MessageSquare,
 } from 'lucide-react'
 
@@ -72,8 +73,6 @@ function tokenCanRevoke(token) {
 
 export default function Invites() {
   const [tokens, setTokens] = useState([])
-  const [query, setQuery] = useState('')
-  const [inventoryStatus, setInventoryStatus] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showOwnerCreate, setShowOwnerCreate] = useState(false)
@@ -81,10 +80,8 @@ export default function Invites() {
   const [generated, setGenerated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [ownerCardStatus, setOwnerCardStatus] = useState(null)
-  const refreshGeneration = useRef(0)
 
   const refresh = useCallback(async () => {
-    const generation = ++refreshGeneration.current
     setRefreshing(true)
     try {
       const [resp, ownerStatusResp] = await Promise.all([
@@ -93,10 +90,8 @@ export default function Invites() {
       ])
       if (!resp.ok) throw new Error(`list failed: ${resp.status}`)
       const data = await resp.json()
-      const ownerStatus = ownerStatusResp.ok ? await ownerStatusResp.json() : null
-      if (generation !== refreshGeneration.current) return
       if (ownerStatusResp.ok) {
-        setOwnerCardStatus(ownerStatus)
+        setOwnerCardStatus(await ownerStatusResp.json())
       } else {
         setOwnerCardStatus({
           ready: false,
@@ -106,24 +101,18 @@ export default function Invites() {
       setTokens(data.tokens || [])
       setError(null)
     } catch (err) {
-      if (generation !== refreshGeneration.current) return
       setOwnerCardStatus(current => current || {
         ready: false,
         reason: 'Owner-card status unavailable.',
       })
       setError(err.message)
     } finally {
-      if (generation === refreshGeneration.current) {
-        setLoading(false)
-        setRefreshing(false)
-      }
+      setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
-  useEffect(() => {
-    refresh()
-    return () => { refreshGeneration.current += 1 }
-  }, [refresh])
+  useEffect(() => { refresh() }, [refresh])
 
   const handleRevoke = async (prefix) => {
     try {
@@ -152,25 +141,16 @@ export default function Invites() {
     )
   }
 
-  const filteredTokens = tokens.filter(token => {
-    const state = tokenStatus(token).label
-    if (inventoryStatus !== 'all' && !(inventoryStatus === 'used' ? state.startsWith('used') : state === inventoryStatus)) return false
-    const needle = query.trim().toLowerCase()
-    return !needle || [token.target_username, token.note, token.token_hash_prefix].some(value => String(value || '').toLowerCase().includes(needle))
-  })
-  const ownerTokens = filteredTokens.filter(isOwnerToken)
-  const guestTokens = filteredTokens.filter(t => !isOwnerToken(t))
-  const filtering = query.trim() || inventoryStatus !== 'all'
+  const ownerTokens = tokens.filter(isOwnerToken)
+  const guestTokens = tokens.filter(t => !isOwnerToken(t))
   const ownerCardUnavailable = ownerCardStatus?.ready === false
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between gap-4">
+    <div className="owner-access">
+      <div className="owner-access-heading">
         <div>
-          <h1 className="text-2xl font-bold text-theme-text">Setup / Owner</h1>
-          <p className="text-theme-text-muted mt-1">
-            Create factory owner cards for ODS Talk, and keep guest chat invites available when you need them.
-          </p>
+          <h1>Owner access</h1>
+          <p>Manage device keys and temporary guest links.</p>
         </div>
         <button
           onClick={refresh}
@@ -184,39 +164,31 @@ export default function Invites() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm flex items-start gap-2">
+        <div role="alert" className="my-4 text-red-400 text-xs flex items-start gap-2">
           <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
-      <VoiceReadiness />
-
-      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-theme-text">
-        <input aria-label="Search access links" placeholder="Search username, note or ID" value={query} onChange={event => setQuery(event.target.value)} className="rounded-lg border border-theme-border bg-theme-card p-2" />
-        <select aria-label="Access link status" value={inventoryStatus} onChange={event => setInventoryStatus(event.target.value)} className="rounded-lg border border-theme-border bg-theme-card p-2">
-          <option value="all">All statuses</option><option value="active">Unused active</option><option value="used">Used / redeemed</option><option value="expired">Expired</option><option value="revoked">Revoked</option>
-        </select>
-        <span role="status">Showing {filteredTokens.length} of {tokens.length} access links</span>
-        {filtering && <button type="button" onClick={() => { setQuery(''); setInventoryStatus('all') }} className="text-theme-accent">Clear filters</button>}
-      </div>
-
-      <section className="mb-8 bg-theme-card border border-theme-border rounded-xl p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <dl className="owner-access-summary" aria-label="Access summary">
+        <div><dt>Owner cards</dt><dd>{ownerTokens.filter(tokenCanRevoke).length}<span> active</span></dd></div>
+        <div><dt>Guest links</dt><dd>{guestTokens.filter(t => tokenStatus(t).label === 'active' || (t.reusable && tokenCanRevoke(t))).length}<span> available</span></dd></div>
+      </dl>
+      <section className="owner-access-section" aria-labelledby="owner-cards-heading">
+        <div className="owner-access-section-heading">
           <div>
             <div className="flex items-center gap-2 text-theme-text">
               <KeyRound size={20} className="text-theme-accent" />
-              <h2 className="text-lg font-semibold">Factory owner card</h2>
+              <h2 id="owner-cards-heading">Owner cards</h2>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-theme-text-muted">
-              This QR is a physical key for the shipped device. It creates normal 12-hour ODS sessions
-              and lands the holder in ODS Talk; the QR itself remains valid until revoked.
+              A reusable QR key for ODS Talk. Sessions last 12 hours; the card stays valid until revoked.
             </p>
           </div>
           <button
             onClick={() => setShowOwnerCreate(true)}
             disabled={ownerCardUnavailable}
-            className="inline-flex items-center justify-center gap-2 bg-theme-accent text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="owner-access-action"
           >
             <Printer size={18} />
             Print owner card
@@ -224,17 +196,14 @@ export default function Invites() {
         </div>
 
         {ownerCardUnavailable && (
-          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100 flex items-start gap-2">
+          <div className="owner-access-notice" role="status">
             <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
             <span>{ownerCardStatus.reason || 'Enable ODS proxy before generating owner cards.'}</span>
           </div>
         )}
 
-        {filtering && ownerTokens.length === 0 ? <p className="mt-5 text-sm text-theme-text-muted">No owner cards match these filters.</p> : ownerTokens.length === 0 ? (
-          <EmptyOwnerState
-            onCreate={() => setShowOwnerCreate(true)}
-            disabled={ownerCardUnavailable}
-          />
+        {ownerTokens.length === 0 ? (
+          <EmptyOwnerState />
         ) : (
           <div className="mt-5 space-y-3">
             {ownerTokens.map(t => (
@@ -244,28 +213,28 @@ export default function Invites() {
         )}
       </section>
 
-      <section className="bg-theme-card border border-theme-border rounded-xl p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <section className="owner-access-section" aria-labelledby="guest-links-heading">
+        <div className="owner-access-section-heading">
           <div>
             <div className="flex items-center gap-2 text-theme-text">
               <MessageSquare size={20} className="text-theme-text-muted" />
-              <h2 className="text-lg font-semibold">Guest access</h2>
+              <h2 id="guest-links-heading">Guest access</h2>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-theme-text-muted">
-              Time-limited magic links still work for short-term access to chat or advanced Hermes.
+              Temporary links to chat or advanced Hermes. Set an expiry and choose whether a link can be reused.
             </p>
           </div>
           <button
             onClick={() => setShowGuestCreate(true)}
-            className="inline-flex items-center justify-center gap-2 bg-theme-bg border border-theme-border text-theme-text px-4 py-2 rounded-lg hover:bg-theme-surface-hover transition-colors"
+            className="owner-access-action"
           >
             <UserPlus size={18} />
             New guest invite
           </button>
         </div>
 
-        {filtering && guestTokens.length === 0 ? <p className="mt-5 text-sm text-theme-text-muted">No guest invites match these filters.</p> : guestTokens.length === 0 ? (
-          <EmptyGuestState onCreate={() => setShowGuestCreate(true)} />
+        {guestTokens.length === 0 ? (
+          <EmptyGuestState />
         ) : (
           <div className="mt-5 space-y-3">
             {guestTokens.map(t => (
@@ -274,6 +243,11 @@ export default function Invites() {
           </div>
         )}
       </section>
+
+      <details className="owner-access-help"><summary>Voice readiness & access safety</summary>
+        <VoiceReadiness />
+        <p>Cards and invite links are credentials. Share them privately and revoke a lost card or an unwanted invite.</p>
+      </details>
 
       {showOwnerCreate && (
         <CreateOwnerModal
@@ -311,11 +285,7 @@ export default function Invites() {
 function VoiceReadiness() {
   const secure = typeof window === 'undefined' ? true : window.isSecureContext
   return (
-    <div className={`mb-6 rounded-xl border p-4 text-sm flex items-start gap-3 ${
-      secure
-        ? 'border-green-500/20 bg-green-500/10 text-green-100'
-        : 'border-amber-500/20 bg-amber-500/10 text-amber-100'
-    }`}>
+    <div className="owner-access-voice">
       <Mic2 size={18} className="mt-0.5 flex-shrink-0" />
       <div>
         <p className="font-medium text-theme-text">Voice readiness</p>
@@ -329,41 +299,20 @@ function VoiceReadiness() {
   )
 }
 
-function EmptyOwnerState({ onCreate, disabled }) {
+function EmptyOwnerState() {
   return (
-    <div className="mt-5 rounded-xl border border-dashed border-theme-border p-6 text-center">
-      <ShieldCheck size={32} className="mx-auto mb-3 text-theme-text-muted" />
-      <h3 className="text-base font-semibold text-theme-text mb-1">No owner cards yet</h3>
-      <p className="text-sm text-theme-text-muted mb-4 max-w-lg mx-auto">
-        Generate one for a factory card or first owner handoff. Revoke it if the printed card is lost.
-      </p>
-      <button
-        onClick={onCreate}
-        disabled={disabled}
-        className="inline-flex items-center gap-2 bg-theme-accent text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-      >
-        <Printer size={18} />
-        Create owner card
-      </button>
+    <div className="owner-access-empty">
+      <p>No owner cards yet</p>
+      <span>Create a card for the device owner when the service is ready.</span>
     </div>
   )
 }
 
-function EmptyGuestState({ onCreate }) {
+function EmptyGuestState() {
   return (
-    <div className="mt-5 rounded-xl border border-dashed border-theme-border p-6 text-center">
-      <Users size={32} className="mx-auto mb-3 text-theme-text-muted" />
-      <h3 className="text-base font-semibold text-theme-text mb-1">No guest invites yet</h3>
-      <p className="text-sm text-theme-text-muted mb-4 max-w-lg mx-auto">
-        Guest links are temporary credentials. Anyone who opens one gets the selected access until it expires or is used.
-      </p>
-      <button
-        onClick={onCreate}
-        className="inline-flex items-center gap-2 bg-theme-bg border border-theme-border text-theme-text px-4 py-2 rounded-lg hover:bg-theme-surface-hover transition-colors"
-      >
-        <UserPlus size={18} />
-        Create guest invite
-      </button>
+    <div className="owner-access-empty">
+      <p>No guest invites yet</p>
+      <span>Create a temporary link when you want to share access.</span>
     </div>
   )
 }
@@ -375,7 +324,7 @@ function TokenRow({ token, onRevoke }) {
   const canRevoke = tokenCanRevoke(token)
 
   return (
-    <div className="bg-theme-bg border border-theme-border rounded-xl p-4 flex items-center justify-between gap-4">
+    <div className="owner-access-token flex items-center justify-between gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="font-medium text-theme-text">{token.target_username}</span>
@@ -383,7 +332,7 @@ function TokenRow({ token, onRevoke }) {
           {isOwnerToken(token) ? (
             <span className="text-xs px-2 py-0.5 rounded bg-theme-accent/20 text-theme-accent-light">owner</span>
           ) : token.reusable && (
-            <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">reusable</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-theme-surface text-theme-text-secondary">reusable</span>
           )}
           <span className="text-xs text-theme-text-muted">scope: {token.scope}</span>
         </div>

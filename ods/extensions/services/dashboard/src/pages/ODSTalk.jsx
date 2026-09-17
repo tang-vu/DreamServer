@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import TalkExport from '../components/TalkExport'
+import remarkGfm from 'remark-gfm'
+import TalkReplyCopy from '../components/TalkReplyCopy'
 import {
   AlertCircle, CheckCircle2, Loader2, Mic, Paperclip, RefreshCw,
   Send, Volume2, VolumeX,
@@ -23,10 +24,11 @@ const MARKDOWN_COMPONENTS = {
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noreferrer" className="underline decoration-zinc-400 underline-offset-2 hover:decoration-zinc-700">{children}</a>
   ),
-  code: ({ inline, children }) => inline
-    ? <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[13px] text-zinc-800">{children}</code>
-    : <code className="block whitespace-pre-wrap break-words rounded bg-zinc-100 p-2 font-mono text-[13px] text-zinc-800">{children}</code>,
-  pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded bg-zinc-100">{children}</pre>,
+  code: ({ className, children }) => <code className={`rounded bg-zinc-100 px-1 py-0.5 font-mono text-[13px] text-zinc-800 ${className || ''}`}>{children}</code>,
+  pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded bg-zinc-100 p-2 [&>code]:block [&>code]:whitespace-pre [&>code]:p-0">{children}</pre>,
+  table: ({ children }) => <div className="my-2 overflow-x-auto"><table className="w-full border-collapse text-left">{children}</table></div>,
+  th: ({ children }) => <th className="border border-zinc-300 px-2 py-1 font-semibold">{children}</th>,
+  td: ({ children }) => <td className="border border-zinc-300 px-2 py-1">{children}</td>,
   blockquote: ({ children }) => <blockquote className="my-2 border-l-2 border-zinc-300 pl-3 italic text-zinc-700">{children}</blockquote>,
   hr: () => <hr className="my-3 border-zinc-200" />,
 }
@@ -39,6 +41,7 @@ const welcomeMessage = {
 }
 
 const TALK_STATUS_RETRY_MS = 1000
+const MAX_MESSAGE_CHARS = 8000
 
 function makeId(prefix) {
   if (globalThis.crypto?.randomUUID) return `${prefix}-${globalThis.crypto.randomUUID()}`
@@ -75,18 +78,31 @@ export default function ODSTalk() {
   })
 
   const [pendingAttachment, setPendingAttachment] = useState(null)
+  const [attachmentError, setAttachmentError] = useState('')
   // {file: File, previewUrl: string|null, kind: 'image'|'text', name: string}
   // Held in state between picking a file and sending — lets the user add a
   // caption in the textarea before submitting.
 
   const bottomRef = useRef(null)
+  const followReplyRef = useRef(true)
+  const [readingEarlier, setReadingEarlier] = useState(false)
   const fileInputRef = useRef(null)
+  const talkStatusRequestRef = useRef(null)
+  const talkStatusMountedRef = useRef(false)
   const recorderRef = useRef(null)
   const recordingChunksRef = useRef([])
   const streamControllerRef = useRef(null)
   // Track the currently-playing TTS state so we can shut down whatever
   // is in flight before starting the next reply's audio.
   const activeSpeechRef = useRef(null)
+  const speechRequestRef = useRef(null)
+  const speechMountedRef = useRef(false)
+  const speechEnabledRef = useRef(spokenReplies)
+  speechEnabledRef.current = spokenReplies
+  useEffect(() => {
+    speechMountedRef.current = true
+    return () => {speechMountedRef.current = false; speechRequestRef.current?.abort()}
+  }, [])
   // One persistent Audio element reused across all replies. iOS Safari's
   // audio session model is single-element-per-page; if we create a new
   // Audio() per turn (the obvious React-y pattern), the OS audio router
@@ -116,18 +132,34 @@ export default function ODSTalk() {
   }, [])
 
   const refreshStatus = useCallback(async () => {
+    if (!talkStatusMountedRef.current) return
+    talkStatusRequestRef.current?.abort()
+    const controller = new AbortController()
+    talkStatusRequestRef.current = controller
+    let rejectAbort
+    const aborted = new Promise((_, reject) => {
+      rejectAbort = () => reject(new Error('ODS Talk status request timed out.'))
+      controller.signal.addEventListener('abort', rejectAbort, {once:true})
+    })
+    const timer = setTimeout(() => controller.abort(), 30000)
     setRetryStatusRefresh(false)
     setStatus('loading')
     try {
-      const resp = await fetch('/api/talk/status', { credentials: 'same-origin' })
-      if (resp.status === 401) {
+      const read = async () => {
+        const resp = await fetch('/api/talk/status', { credentials: 'same-origin', signal:controller.signal })
+        if (resp.status === 401) return {expired:true}
+        if (!resp.ok) throw new Error(await parseError(resp, 'ODS Talk is not ready.'))
+        return {data:await resp.json()}
+      }
+      const result = await Promise.race([read(), aborted])
+      if (!talkStatusMountedRef.current || talkStatusRequestRef.current !== controller) return
+      if (result.expired) {
         setStatus('expired')
         setStatusText('Session expired. Scan the owner card again.')
         setRetryStatusRefresh(false)
         return
       }
-      if (!resp.ok) throw new Error(await parseError(resp, 'ODS Talk is not ready.'))
-      const data = await resp.json()
+      const data = result.data
       const capabilities = data.capabilities || {}
       const compatibilityReason = data.reason || data.modelCompatibility?.hermesTalk?.reason || ''
       setVoiceState({
@@ -145,13 +177,26 @@ export default function ODSTalk() {
       setStatusText('Ready')
       setRetryStatusRefresh(false)
     } catch (err) {
+      if (!talkStatusMountedRef.current || talkStatusRequestRef.current !== controller) return
       setStatus('offline')
       setStatusText(err.message || 'ODS Talk is offline.')
       setRetryStatusRefresh(true)
+    } finally {
+      clearTimeout(timer)
+      controller.signal.removeEventListener('abort', rejectAbort)
+      if (talkStatusRequestRef.current === controller) talkStatusRequestRef.current = null
     }
   }, [liveMicSupported])
 
-  useEffect(() => { refreshStatus() }, [refreshStatus])
+  useEffect(() => {
+    talkStatusMountedRef.current = true
+    refreshStatus()
+    return () => {
+      talkStatusMountedRef.current = false
+      talkStatusRequestRef.current?.abort()
+      talkStatusRequestRef.current = null
+    }
+  }, [refreshStatus])
 
   // Poll while offline. A one-shot setTimeout does not reschedule here: a
   // failed retry sets `status` and `retryStatusRefresh` to the values they
@@ -174,8 +219,25 @@ export default function ODSTalk() {
   }, [refreshStatus, retryStatusRefresh, status, statusAttempt])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ block: 'end' })
+    function trackPosition() {
+      const root = document.scrollingElement || document.documentElement
+      const top = document.scrollingElement ? root.scrollTop : window.scrollY
+      const height = Math.max(root.scrollHeight, document.body.scrollHeight)
+      const nearBottom = height - top - window.innerHeight <= 64
+      followReplyRef.current = nearBottom
+      setReadingEarlier(!nearBottom)
+    }
+    window.addEventListener('scroll', trackPosition, {passive:true})
+    return () => window.removeEventListener('scroll', trackPosition)
+  }, [])
+  useEffect(() => {
+    if (followReplyRef.current) bottomRef.current?.scrollIntoView?.({ block: 'end' })
   }, [messages])
+  function jumpToLatest() {
+    followReplyRef.current = true
+    setReadingEarlier(false)
+    bottomRef.current?.scrollIntoView?.({block:'end'})
+  }
 
   useEffect(() => {
     try {
@@ -199,6 +261,8 @@ export default function ODSTalk() {
   // ObjectURL. The same element keeps its hold on the audio session
   // across turns, so the next play() lands without contention.
   const stopActiveSpeech = useCallback(() => {
+    speechRequestRef.current?.abort()
+    speechRequestRef.current = null
     const prev = activeSpeechRef.current
     activeSpeechRef.current = null
     if (!prev) return
@@ -219,20 +283,26 @@ export default function ODSTalk() {
     }
   }, [])
 
+  useEffect(() => {if (!spokenReplies) stopActiveSpeech()}, [spokenReplies, stopActiveSpeech])
+
   const speak = useCallback(async (text) => {
-    if (!spokenReplies || !voiceState.tts || !text.trim()) return
+    if (!speechMountedRef.current || !speechEnabledRef.current || !voiceState.tts || !text.trim()) return
     // ALWAYS stop the previous Audio/MediaSource before starting a new
     // one. Even if the previous one is still buffering chunks, the user
     // has clearly moved on (a new reply text has arrived).
     stopActiveSpeech()
+    const controller = new AbortController()
+    speechRequestRef.current = controller
     try {
       const body = new FormData()
       body.set('text', text)
       const resp = await fetch('/api/talk/speak', {
         method: 'POST',
+        signal: controller.signal,
         body,
         credentials: 'same-origin',
       })
+      if (controller.signal.aborted) {await resp.body?.cancel(); return}
       if (!resp.ok || !resp.body) return
 
       // Preferred path: MediaSource API plays MP3 chunks as they arrive
@@ -313,6 +383,7 @@ export default function ODSTalk() {
               sb.addEventListener('error', reject, { once: true })
               sb.appendBuffer(value)
             })
+            if (controller.signal.aborted || activeSpeechRef.current !== session) break
             if (!started) {
               started = true
               // play() returns a Promise on modern browsers. If iOS
@@ -348,6 +419,7 @@ export default function ODSTalk() {
       // The dashboard-api is still streaming on the network — we just
       // wait until it's all here before starting playback.
       const blob = await resp.blob()
+      if (controller.signal.aborted) return
       const url = URL.createObjectURL(blob)
       const audio = getSharedAudio()
       audio.src = url
@@ -370,7 +442,7 @@ export default function ODSTalk() {
     // Allow an attachment with no text — the backend supplies a default
     // prompt for images ("Describe what you see in this image."). Without
     // either a caption or an attachment, there's nothing to send.
-    if (!clean && !attachment) return
+    if ((!clean && !attachment) || Array.from(clean).length > MAX_MESSAGE_CHARS) return
     if (sending || status !== 'ready') return
     setSending(true)
 
@@ -451,61 +523,72 @@ export default function ODSTalk() {
       const reader = resp.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let completed = false
       // SSE frames are separated by a blank line (\n\n). Buffer partial frames
       // across reads — chunked transport can split mid-frame. Lines starting
       // with ``:`` are SSE comments (keepalives); we discard them by filtering
       // for ``data:`` only below.
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        let sepIdx
-        while ((sepIdx = buffer.indexOf('\n\n')) !== -1) {
-          const frame = buffer.slice(0, sepIdx)
-          buffer = buffer.slice(sepIdx + 2)
-          const dataLines = frame.split('\n').filter(line => line.startsWith('data:'))
-          if (dataLines.length === 0) continue
-          const json = dataLines.map(l => l.slice(5).trimStart()).join('\n')
-          let payload
-          try {
-            payload = JSON.parse(json)
-          } catch {
-            continue
-          }
-          if (payload.type === 'delta' && typeof payload.text === 'string') {
-            assembled += payload.text
-            const snapshot = assembled
-            // Once token deltas start arriving the spinner caption is no
-            // longer useful — clear it so the assistant bubble shows the
-            // live text instead. `status: null` signals MessageBubble to
-            // render the accumulated text rather than a spinner.
-            setMessages(items => items.map(item =>
-              item.id === assistantId
-                ? { ...item, text: snapshot, status: 'pending', statusLabel: null, statusTool: null, statusDetail: null }
-                : item,
-            ))
-          } else if (payload.type === 'status') {
-            // Friendly progress caption from the bridge (e.g. "Searching the
-            // web…"). Replaces the default "Thinking…" while a tool is in
-            // flight. label=null means "tool done; flip back to default."
-            const label = typeof payload.label === 'string' ? payload.label : null
-            const tool = typeof payload.tool === 'string' ? payload.tool : null
-            const detail = typeof payload.detail === 'string' ? payload.detail : null
-            setMessages(items => items.map(item =>
-              item.id === assistantId
-                ? { ...item, statusLabel: label, statusTool: tool, statusDetail: detail }
-                : item,
-            ))
-          } else if (payload.type === 'complete') {
-            if (typeof payload.text === 'string' && payload.text) assembled = payload.text
-            finalWarning = payload.warning || null
-          } else if (payload.type === 'error') {
-            errorDetail = payload.detail || 'Hermes did not finish the response.'
+      try {
+        streamLoop: while (true) {
+          const { value, done } = await reader.read()
+          controller.signal.throwIfAborted()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          let sepIdx
+          while ((sepIdx = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, sepIdx)
+            buffer = buffer.slice(sepIdx + 2)
+            const dataLines = frame.split('\n').filter(line => line.startsWith('data:'))
+            if (dataLines.length === 0) continue
+            const json = dataLines.map(l => l.slice(5).trimStart()).join('\n')
+            let payload
+            try {
+              payload = JSON.parse(json)
+            } catch {
+              continue
+            }
+            if (payload.type === 'delta' && typeof payload.text === 'string') {
+              assembled += payload.text
+              const snapshot = assembled
+              // Once token deltas start arriving the spinner caption is no
+              // longer useful — clear it so the assistant bubble shows the
+              // live text instead. `status: null` signals MessageBubble to
+              // render the accumulated text rather than a spinner.
+              setMessages(items => items.map(item =>
+                item.id === assistantId
+                  ? { ...item, text: snapshot, status: 'pending', statusLabel: null, statusTool: null, statusDetail: null }
+                  : item,
+              ))
+            } else if (payload.type === 'status') {
+              // Friendly progress caption from the bridge (e.g. "Searching the
+              // web…"). Replaces the default "Thinking…" while a tool is in
+              // flight. label=null means "tool done; flip back to default."
+              const label = typeof payload.label === 'string' ? payload.label : null
+              const tool = typeof payload.tool === 'string' ? payload.tool : null
+              const detail = typeof payload.detail === 'string' ? payload.detail : null
+              setMessages(items => items.map(item =>
+                item.id === assistantId
+                  ? { ...item, statusLabel: label, statusTool: tool, statusDetail: detail }
+                  : item,
+              ))
+            } else if (payload.type === 'done') {
+              break streamLoop
+            } else if (payload.type === 'complete') {
+              completed = true
+              if (typeof payload.text === 'string' && payload.text) assembled = payload.text
+              finalWarning = payload.warning || null
+            } else if (payload.type === 'error') {
+              errorDetail = payload.detail || 'Hermes did not finish the response.'
+            }
           }
         }
-      }
 
+      } finally {
+        try { await reader.cancel() } finally { reader.releaseLock() }
+      }
+      controller.signal.throwIfAborted()
       if (errorDetail) throw new Error(errorDetail)
+      if (!completed) throw new Error('The response ended before completion. You can retry this message.')
       const reply = assembled || 'I did not get a response back.'
       setMessages(items => items.map(item =>
         item.id === assistantId
@@ -515,12 +598,13 @@ export default function ODSTalk() {
       speak(reply)
     } catch (err) {
       if (err.name === 'AbortError') {
-        // User-initiated cancellation. Drop the placeholder bubble silently.
-        setMessages(items => items.filter(item => item.id !== assistantId))
+        setMessages(items => items.map(item => item.id === assistantId
+          ? {...item, text:assembled || 'Response stopped.', status:'done', statusLabel:null, statusTool:null, statusDetail:null, warning:'Response stopped. The reply may be incomplete.'}
+          : item))
       } else {
         setMessages(items => items.map(item =>
           item.id === assistantId
-            ? { ...item, text: err.message || 'Something went wrong.', status: 'error' }
+            ? { ...item, text: assembled || err.message || 'Something went wrong.', status: 'error', warning: assembled ? err.message : null }
             : item,
         ))
       }
@@ -539,7 +623,7 @@ export default function ODSTalk() {
     const assistantId = makeId('assistant')
     setMessages(items => [
       ...items,
-      { id: userId, role: 'user', text: 'Voice message', status: 'pending' },
+      { id: userId, role: 'user', text: 'Voice message', audioFileForRetry: file, status: 'pending' },
       { id: assistantId, role: 'assistant', text: '', status: 'pending' },
     ])
 
@@ -610,7 +694,15 @@ export default function ODSTalk() {
 
   const handleAttachmentPicked = useCallback((file) => {
     if (!file || sending || status === 'expired') return
-    const isImage = (file.type || '').startsWith('image/')
+    const mime = (file.type || '').split(';', 1)[0].toLowerCase().trim()
+    const extension = (file.name || '').split('.').pop().toLowerCase()
+    const isImage = mime.startsWith('image/') || ['avif','bmp','gif','heic','heif','jpeg','jpg','png','webp'].includes(extension)
+    const isText = ['text/plain','text/markdown','text/csv','text/x-markdown','application/json','application/xml','text/xml','application/x-yaml','text/yaml','text/x-yaml'].includes(mime)
+      || ['txt','md','markdown','csv','json','yaml','yml','log','py','js','ts','tsx','jsx','html','css','sh'].includes(extension)
+    if (!isImage && !isText) { setAttachmentError('This file type is not supported. Choose an image, text or code file.'); return }
+    const limit = (isImage ? 10 : 5) * 1024 * 1024
+    if (file.size > limit) { setAttachmentError(`Choose ${isImage ? 'an image up to 10' : 'a text file up to 5'} MiB.`); return }
+    setAttachmentError('')
     const previewUrl = isImage ? URL.createObjectURL(file) : null
     setPendingAttachment(prev => {
       // Revoke a previous blob URL before swapping in a new one so the
@@ -638,17 +730,19 @@ export default function ODSTalk() {
 
   const retryLast = () => {
     const lastUser = [...messages].reverse().find(message => message.role === 'user' && message.status !== 'pending')
-    if (lastUser) sendText(lastUser.text, { attachment: lastUser.attachmentForRetry || null })
+    if (lastUser?.audioFileForRetry) sendAudioFile(lastUser.audioFileForRetry)
+    else if (lastUser) sendText(lastUser.text, { attachment: lastUser.attachmentForRetry || null })
   }
 
   // Send is enabled either with text OR an attachment (an image alone is a
   // valid message — the model gets a default "describe this" prompt).
-  const canSend = (input.trim().length > 0 || pendingAttachment) && !sending && status === 'ready'
+  const captionTooLong = Array.from(input.trim()).length > MAX_MESSAGE_CHARS
+  const canSend = !captionTooLong && (input.trim().length > 0 || pendingAttachment) && !sending && status === 'ready'
 
   return (
-    <div className="min-h-dvh bg-[#f8faf8] text-zinc-950 antialiased">
+    <div className="pixel-app ods-talk min-h-dvh bg-theme-bg text-theme-text antialiased">
       <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-        <header className="sticky top-0 z-10 border-b border-zinc-200 bg-[#f8faf8]/95 px-4 py-3 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-theme-border bg-theme-bg px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-base font-semibold leading-tight tracking-normal">ODS Talk</h1>
@@ -682,7 +776,6 @@ export default function ODSTalk() {
               </button>
             </div>
           </div>
-          <TalkExport messages={messages} busy={sending || recording} />
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 py-4">
@@ -712,10 +805,13 @@ export default function ODSTalk() {
           </div>
         )}
 
-        <form onSubmit={submit} className="sticky bottom-0 border-t border-zinc-200 bg-[#f8faf8]/95 p-3 backdrop-blur">
+        <form onSubmit={submit} className="sticky bottom-0 bg-theme-bg p-3">
+          {captionTooLong && <p id="talk-caption-limit" role="alert" className="mb-2 text-sm text-red-600">Shorten the message to 8,000 characters before sending. Your draft and attachment are kept.</p>}
+          {readingEarlier && <button type="button" onClick={jumpToLatest} className="mb-2 rounded-full border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800">Jump to latest reply</button>}
           {/* Attachment preview strip — appears above the input bar between
               pick and send. Shows a thumbnail for images, a generic icon for
               text/code files, with an X to discard. */}
+          {attachmentError && <p role="alert" className="mb-2 text-sm text-red-700">{attachmentError}</p>}
           {pendingAttachment && (
             <AttachmentPreview
               attachment={pendingAttachment}
@@ -756,13 +852,15 @@ export default function ODSTalk() {
               value={input}
               onChange={event => setInput(event.target.value)}
               onKeyDown={event => {
-                if (event.key === 'Enter' && !event.shiftKey) {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault()
-                  if (canSend) sendText(input)
+                  if (canSend) submit(event)
                 }
               }}
               rows={1}
               placeholder="Message ODS"
+              aria-invalid={captionTooLong || undefined}
+              aria-describedby={captionTooLong ? 'talk-caption-limit' : undefined}
               className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-1 py-2.5 text-[16px] leading-6 text-zinc-950 outline-none placeholder:text-zinc-400"
               disabled={status === 'expired'}
             />
@@ -790,6 +888,9 @@ export default function ODSTalk() {
               {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>
           </div>
+          {sending && streamControllerRef.current && <div className="mt-2 flex justify-end">
+            <button type="button" onClick={() => streamControllerRef.current?.abort()} className="rounded border border-zinc-300 px-3 py-2 text-sm">Stop response</button>
+          </div>}
           {messages.some(message => message.status === 'error') && (
             <div className="mt-2 flex justify-end">
               <button type="button" onClick={retryLast} className="text-sm font-medium text-zinc-700">
@@ -854,9 +955,10 @@ function MessageBubble({ message }) {
           </>
         ) : (
           <div className="space-y-0 text-[15px] leading-6">
-            <ReactMarkdown components={MARKDOWN_COMPONENTS}>{message.text}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>{message.text}</ReactMarkdown>
           </div>
         )}
+        {!user && message.id !== 'welcome' && message.status === 'done' && message.text && <TalkReplyCopy key={message.text} text={message.text}/>}
         {message.warning && (
           <p className="mt-2 text-xs text-amber-600">{message.warning}</p>
         )}
