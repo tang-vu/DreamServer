@@ -19,6 +19,7 @@ from typing import Any
 
 VRAM_FIT_TOLERANCE_GB = 0.25
 POLICY = "context-aware-largest-capable-general-v1"
+PIXEL_AGENT_POLICY = "pixel-agent-capability-v1"
 SPARK_AARCH64_POLICY = "spark-aarch64-nv-ultra-a3b-v1"
 SPARK_AARCH64_MODEL_ID = "qwen3.6-35b-a3b-ud-q4"
 # Unified-memory hosts (Strix Halo SH_LARGE, future AMD/NV unified-memory
@@ -93,6 +94,21 @@ def normalize_model(raw: dict[str, Any]) -> dict[str, Any] | None:
         context_length = int(raw.get("context_length") or 0)
     except (TypeError, ValueError):
         context_length = 0
+    app_compatibility = (
+        raw.get("app_compatibility")
+        if isinstance(raw.get("app_compatibility"), dict)
+        else {}
+    )
+    agent_viability = (
+        app_compatibility.get("agent_viability")
+        if isinstance(app_compatibility.get("agent_viability"), dict)
+        else {}
+    )
+    pixel_agent = (
+        app_compatibility.get("pixel_agent")
+        if isinstance(app_compatibility.get("pixel_agent"), dict)
+        else {}
+    )
     return {
         "id": str(model_id),
         "name": raw.get("name") or str(model_id),
@@ -109,6 +125,8 @@ def normalize_model(raw: dict[str, Any]) -> dict[str, Any] | None:
         "specialty": raw.get("specialty") or "General",
         "llama_server_image": raw.get("llama_server_image") or "",
         "install_recommendation": value_enabled(raw.get("install_recommendation", True)),
+        "agent_viability_status": normalize_key(agent_viability.get("status")),
+        "pixel_agent_status": normalize_key(pixel_agent.get("status")),
         "runtime_profiles": raw.get("runtime_profiles") if isinstance(raw.get("runtime_profiles"), list) else [],
     }
 
@@ -182,12 +200,20 @@ def selector_required_memory_gb(model: dict[str, Any]) -> float:
     return round(max(declared, size_gb + estimated_context_kv_gb(model)), 2)
 
 
-def matching_runtime_profile(model: dict[str, Any], backend: str, memory_type: str,
-                             vram_mb: int, ram_gb: int, host_arch: str) -> dict[str, Any] | None:
+def hardware_matching_profiles(model: dict[str, Any], backend: str, memory_type: str,
+                               vram_mb: int, host_arch: str) -> list[dict[str, Any]]:
+    """Return profiles anchored to this hardware before system-RAM filtering.
+
+    Once a catalog model has a profile for this exact backend/architecture/
+    memory envelope, that profile is its safety contract. If the system-RAM
+    requirement is not met, callers must not silently score the same model as
+    though the hardware-specific profile did not exist.
+    """
     backend_key = normalize_key(backend)
     memory_key = normalize_key(memory_type)
     arch_key = normalize_host_arch(host_arch)
     vram_gb = float(vram_mb or 0) / 1024.0
+    matches: list[dict[str, Any]] = []
     for profile in model.get("runtime_profiles", []) or []:
         if not isinstance(profile, dict):
             continue
@@ -204,6 +230,18 @@ def matching_runtime_profile(model: dict[str, Any], backend: str, memory_type: s
                 continue
             if profile.get("vram_max_gb") is not None and vram_gb > float(profile["vram_max_gb"]):
                 continue
+        except (TypeError, ValueError):
+            continue
+        matches.append(profile)
+    return matches
+
+
+def matching_runtime_profile(model: dict[str, Any], backend: str, memory_type: str,
+                             vram_mb: int, ram_gb: int, host_arch: str) -> dict[str, Any] | None:
+    for profile in hardware_matching_profiles(
+        model, backend, memory_type, vram_mb, host_arch
+    ):
+        try:
             if profile.get("system_ram_min_gb") is not None and float(ram_gb or 0) < float(profile["system_ram_min_gb"]):
                 continue
         except (TypeError, ValueError):
@@ -263,6 +301,14 @@ def install_recommendation_allowed(model: dict[str, Any]) -> bool:
     return bool(model.get("gguf_url")) and bool(model.get("install_recommendation", True))
 
 
+def pixel_agent_ready(model: dict[str, Any]) -> bool:
+    """Require an explicit real-Pixel capability verdict for the Pixel route."""
+    return normalize_key(model.get("pixel_agent_status")) in {
+        "verified",
+        "pixel-agent-viable",
+    }
+
+
 def size_within_ceiling(model: dict[str, Any], max_size_mb: float) -> bool:
     """True if `model` respects an optional tier size ceiling.
 
@@ -282,7 +328,63 @@ def size_within_ceiling(model: dict[str, Any], max_size_mb: float) -> bool:
 def rank_models(catalog: list[dict[str, Any]], capacity_gb: float, profile: str,
                 installable_only: bool, backend: str, memory_type: str,
                 vram_mb: int, ram_gb: int, host_arch: str,
-                max_size_mb: float = 0) -> list[dict[str, Any]]:
+                max_size_mb: float = 0,
+                agent_ready_only: bool = False) -> list[dict[str, Any]]:
+    def ranked_candidates(*, enforce_size_ceiling: bool) -> list[dict[str, Any]]:
+        ranked_pool: list[tuple[float, dict[str, Any]]] = []
+        for model in catalog:
+            if installable_only and not install_recommendation_allowed(model):
+                continue
+            if agent_ready_only and not pixel_agent_ready(model):
+                continue
+            if not family_allowed(model, profile):
+                continue
+            if enforce_size_ceiling and not size_within_ceiling(model, max_size_mb):
+                continue
+            runtime_profile = matching_runtime_profile(
+                model, backend, memory_type, vram_mb, ram_gb, host_arch
+            )
+            if runtime_profile is None and hardware_matching_profiles(
+                model, backend, memory_type, vram_mb, host_arch
+            ):
+                continue
+            candidate_model = (
+                {**model, "_runtime_profile": runtime_profile}
+                if runtime_profile
+                else model
+            )
+            required = effective_required_memory_gb(candidate_model, runtime_profile)
+            if not fits(required, capacity_gb):
+                continue
+            ranked_pool.append(
+                (score_model(candidate_model, capacity_gb, profile), candidate_model)
+            )
+        ranked_pool.sort(
+            key=lambda item: (
+                item[0],
+                effective_required_memory_gb(
+                    item[1], item[1].get("_runtime_profile")
+                ),
+                effective_context_length(
+                    item[1], item[1].get("_runtime_profile")
+                ),
+            ),
+            reverse=True,
+        )
+        return [model for _, model in ranked_pool]
+
+    ranked = ranked_candidates(enforce_size_ceiling=True)
+    # A tier size ceiling is a resource preference, not permission to ship a
+    # knowingly failed default model for Pixel. If no explicitly verified
+    # agent model fits below the ceiling, relax only that ceiling while still
+    # enforcing artifact pins, hardware memory fit, family, and installability.
+    if not ranked and agent_ready_only and max_size_mb > 0:
+        ranked = ranked_candidates(enforce_size_ceiling=False)
+    if ranked:
+        return ranked
+    if agent_ready_only:
+        return []
+
     candidates = []
     for model in catalog:
         if installable_only and not install_recommendation_allowed(model):
@@ -292,24 +394,35 @@ def rank_models(catalog: list[dict[str, Any]], capacity_gb: float, profile: str,
         if not size_within_ceiling(model, max_size_mb):
             continue
         runtime_profile = matching_runtime_profile(model, backend, memory_type, vram_mb, ram_gb, host_arch)
+        if runtime_profile is None and hardware_matching_profiles(
+            model, backend, memory_type, vram_mb, host_arch
+        ):
+            continue
         candidate_model = {**model, "_runtime_profile": runtime_profile} if runtime_profile else model
         required = effective_required_memory_gb(candidate_model, runtime_profile)
         if not fits(required, capacity_gb):
             continue
         candidates.append((score_model(candidate_model, capacity_gb, profile), candidate_model))
     if not candidates:
+        # A hardware-matching profile is a safety boundary. If it failed its
+        # RAM gate, do not reintroduce that model through the generic fallback.
         fallback_pool = [
             model for model in catalog
             if (not installable_only or install_recommendation_allowed(model))
             and family_allowed(model, profile)
             and size_within_ceiling(model, max_size_mb)
+            and not hardware_matching_profiles(
+                model, backend, memory_type, vram_mb, host_arch
+            )
         ] or [
             model for model in catalog
             if (not installable_only or install_recommendation_allowed(model)) and family_allowed(model, profile)
-        ] or [
-            model for model in catalog
-            if install_recommendation_allowed(model)
-        ] or catalog
+            and not hardware_matching_profiles(
+                model, backend, memory_type, vram_mb, host_arch
+            )
+        ]
+        if not fallback_pool:
+            return []
         fallback = min(fallback_pool, key=lambda m: float(m.get("vram_required_gb") or 999))
         return [fallback]
     candidates.sort(
@@ -447,6 +560,12 @@ def main() -> int:
     )
     parser.add_argument("--host-arch", default="unknown")
     parser.add_argument("--installable-only", action="store_true")
+    parser.add_argument(
+        "--agent-ready-only",
+        action="store_true",
+        help="Select only models with an explicit verified Pixel capability verdict; "
+             "used for the Pixel default route.",
+    )
     parser.add_argument("--env", action="store_true", help="print shell assignments")
     args = parser.parse_args()
 
@@ -468,10 +587,21 @@ def main() -> int:
         args.ram_gb,
         args.host_arch,
         args.max_size_mb,
+        args.agent_ready_only,
     )
-    arch_selected, arch_policy_tag = arch_policy_model(
-        catalog, args.tier, profile, args.host_arch, args.memory_type, args.installable_only, ranked[0],
-    )
+    if not ranked:
+        if args.agent_ready_only:
+            message = "no explicitly verified Pixel agent model fits the detected hardware"
+        else:
+            message = "no installable model fits the detected hardware runtime profiles"
+        print(f"error: {message}", file=sys.stderr)
+        return 2
+    arch_selected, arch_policy_tag = (None, None)
+    if not args.agent_ready_only:
+        arch_selected, arch_policy_tag = arch_policy_model(
+            catalog, args.tier, profile, args.host_arch, args.memory_type,
+            args.installable_only, ranked[0],
+        )
     if arch_selected:
         selected = arch_selected
         alternatives = [selected] + [
@@ -484,14 +614,22 @@ def main() -> int:
     else:
         selected = ranked[0]
         alternatives = ranked[:3]
-        policy = POLICY
+        policy = f"{POLICY}+{PIXEL_AGENT_POLICY}" if args.agent_ready_only else POLICY
         source = "catalog_runtime_profile_pre_download" if selected.get("_runtime_profile") else "catalog_fit_pre_download"
         reason = recommendation_reason(selected, capacity_gb, memory_label, args.backend, confidence)
-        if args.max_size_mb > 0:
+        if args.agent_ready_only:
+            reason += " Pixel default selection requires an explicit verified Pixel capability verdict."
+        if args.max_size_mb > 0 and size_within_ceiling(selected, args.max_size_mb):
             reason += (
                 f" Bounded by --tier {args.tier}'s model size ceiling "
                 f"({args.max_size_mb:g}MB); use ODS_DISABLE_CATALOG_MODEL_SELECTOR=true "
                 f"to bypass."
+            )
+        elif args.max_size_mb > 0:
+            reason += (
+                f" Pixel capability readiness overrides --tier {args.tier}'s "
+                f"{args.max_size_mb:g}MB model size preference because no verified "
+                "agent model fits beneath it."
             )
 
     selected_public = {key: value for key, value in selected.items() if key != "_runtime_profile"}
@@ -541,6 +679,7 @@ def main() -> int:
         "MODEL_RECOMMENDATION_CONFIDENCE": payload["confidence"],
         "MODEL_RECOMMENDATION_REASON": payload["reason"],
         "MODEL_RECOMMENDED_ALTERNATIVES": alt_value,
+        "PIXEL_AGENT_MODEL_READY": "true" if pixel_agent_ready(selected) else "false",
     }
     if runtime_profile:
         env["MODEL_RUNTIME_PROFILE"] = runtime_profile.get("id", "")

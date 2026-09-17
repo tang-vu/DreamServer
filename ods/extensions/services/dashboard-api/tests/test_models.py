@@ -996,6 +996,30 @@ def test_agent_activation_conflict_preserves_target(monkeypatch):
     assert exc_info.value.detail == payload
 
 
+def test_agent_activation_preserves_preflight_validation_detail(monkeypatch):
+    import routers.models as models_router
+
+    payload = {
+        "error": "ODS-managed Pixel requires a model context of at least 4096 tokens",
+        "code": "pixel_context_too_small",
+    }
+
+    def invalid(*_args, **_kwargs):
+        raise models_router.AgentHTTPError(400, payload["error"], json.dumps(payload))
+
+    monkeypatch.setattr(models_router, "request_agent_json", invalid)
+
+    with pytest.raises(models_router.HTTPException) as exc_info:
+        models_router._call_agent_model(
+            "/v1/model/activate",
+            {"model_id": "ministral3-8b-instruct-2512-q4", "context_length": 8192},
+            timeout=600,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == payload
+
+
 def test_agent_activation_waits_for_download_lifecycle_teardown(monkeypatch):
     import routers.models as models_router
 
@@ -1611,6 +1635,32 @@ def test_load_model_rejects_external_backend_before_lookup_or_agent_call(
     assert detail["requestedModelId"] == "downloaded-model"
 
 
+def test_load_model_refuses_to_interrupt_an_active_pixel_stream(monkeypatch):
+    import routers.models as models_router
+
+    monkeypatch.setattr(models_router, "_model_activation_mode_denial", lambda *_args: None)
+    monkeypatch.setattr(models_router, "_find_loadable_model", lambda _model_id: {"id": "next-model"})
+    monkeypatch.setattr(models_router, "_already_active_model", lambda *_args: (False, None))
+    monkeypatch.setattr(models_router, "pixel_stream_active", lambda: True)
+    monkeypatch.setattr(
+        models_router,
+        "_call_agent_model",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("active Pixel turn reached host-agent activation")
+        ),
+    )
+
+    with pytest.raises(models_router.HTTPException) as exc_info:
+        models_router.load_model("next-model", body=None)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == {
+        "code": "pixel_chat_active",
+        "message": "Pixel is working. Stop the active response before changing models.",
+        "requestedModelId": "next-model",
+    }
+
+
 def _gpu():
     return GPUInfo(
         name="NVIDIA GeForce RTX 4060",
@@ -2181,13 +2231,19 @@ def test_load_model_reconciles_matching_runtime_without_completion_receipt(
     _write_model_library(install_dir, [model])
     (data_dir / "models" / model["gguf_file"]).write_text("model", encoding="utf-8")
     (install_dir / ".env").write_text(
-        "ODS_MODE=local\nLLM_MODEL=qwen3.5-9b\nGGUF_FILE=Qwen3.5-9B-Q4_K_M.gguf\n",
+        "ODS_MODE=local\n"
+        "LLM_MODEL=qwen3.5-9b\n"
+        "GGUF_FILE=Qwen3.5-9B-Q4_K_M.gguf\n"
+        "CTX_SIZE=65536\n"
+        "MAX_CONTEXT=65536\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(
         models_router,
         "_fetch_loaded_model_sync",
-        lambda: "extra.Qwen3.5-9B-Q4_K_M.gguf",
+        # Switchboard identity is intentionally opaque; the configured GGUF
+        # and active-model record remain the authoritative identity proof.
+        lambda: "ods/current",
     )
     monkeypatch.setattr(models_router, "_loaded_model_backend_ready_sync", lambda _loaded: True)
     calls = []
@@ -2202,7 +2258,66 @@ def test_load_model_reconciles_matching_runtime_without_completion_receipt(
 
     assert resp.status_code == 200
     assert resp.json()["status"] == "activated"
-    assert calls and calls[0][0] == "/v1/model/activate"
+    assert calls == [(
+        "/v1/model/activate",
+        {"model_id": model["id"], "context_length": 65536},
+        2700,
+    )]
+
+
+def test_load_model_preserves_context_when_env_bind_inode_is_stale(
+    test_client,
+    monkeypatch,
+    tmp_path,
+):
+    models_router, install_dir, data_dir = _patch_model_router_paths(monkeypatch, tmp_path)
+    model = {
+        "id": "qwen3.5-9b-q4",
+        "name": "Qwen 3.5 9B",
+        "gguf_file": "Qwen3.5-9B-Q4_K_M.gguf",
+        "size_mb": 5760,
+        "vram_required_gb": 8,
+        "context_length": 32768,
+        "quantization": "Q4_K_M",
+        "specialty": "General",
+        "description": "Balanced default.",
+        "llm_model_name": "qwen3.5-9b",
+    }
+    _write_model_library(install_dir, [model])
+    (data_dir / "models" / model["gguf_file"]).write_text("model", encoding="utf-8")
+    # This is the old inode still visible through the container bind mount.
+    (install_dir / ".env").write_text(
+        "ODS_MODE=local\n"
+        "LLM_MODEL=qwen3.5-2b\n"
+        "GGUF_FILE=Qwen3.5-2B-Q4_K_M.gguf\n"
+        "CTX_SIZE=65536\n"
+        "MAX_CONTEXT=65536\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        models_router,
+        "_fetch_loaded_model_sync",
+        lambda: f"extra.{model['gguf_file']}",
+    )
+    calls = []
+    monkeypatch.setattr(
+        models_router,
+        "_call_agent_model",
+        lambda path, body, timeout=30, **_kwargs: calls.append((path, body, timeout))
+        or {"status": "activated"},
+    )
+
+    resp = test_client.post(
+        f"/api/models/{model['id']}/load",
+        headers=test_client.auth_headers,
+    )
+
+    assert resp.status_code == 200
+    assert calls == [(
+        "/v1/model/activate",
+        {"model_id": model["id"], "context_length": 65536},
+        2700,
+    )]
 
 
 def test_load_model_delegates_when_live_backend_reports_different_model(test_client, monkeypatch, tmp_path):

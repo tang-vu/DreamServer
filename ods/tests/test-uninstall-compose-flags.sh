@@ -68,9 +68,22 @@ EOF
 
     cat > "$stub_dir/sudo" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "$*" >> "${SUDO_LOG:?}"
+if [[ "$*" == "-n -v" ]]; then
+    exit "${SUDO_VALIDATE_EXIT_CODE:-0}"
+fi
 exit 0
 EOF
     chmod +x "$stub_dir/sudo"
+
+    cat > "$stub_dir/id" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -u|-g) printf '1000\n' ;;
+    *) exit 1 ;;
+esac
+EOF
+    chmod +x "$stub_dir/id"
 
     cat > "$stub_dir/pgrep" <<'EOF'
 #!/usr/bin/env bash
@@ -82,9 +95,10 @@ EOF
 make_install() {
     local install_dir="$1"
 
-    mkdir -p "$install_dir/data" "$install_dir/lib"
+    mkdir -p "$install_dir/data" "$install_dir/lib" "$install_dir/systemd"
     cp "$TARGET" "$install_dir/ods-uninstall.sh"
     cp "$ROOT_DIR/lib/safe-env.sh" "$install_dir/lib/safe-env.sh"
+    cp "$ROOT_DIR/lib/system-uninstall.sh" "$install_dir/lib/system-uninstall.sh"
     touch "$install_dir/ods-cli"
     touch "$install_dir/docker-compose.base.yml"
     touch "$install_dir/docker-compose.cpu.yml"
@@ -102,6 +116,9 @@ run_uninstall() {
     INSTALL_DIR="$install_dir" \
     PATH="$stub_dir:$PATH" \
     DOCKER_LOG="${DOCKER_LOG:?}" \
+    SUDO_LOG="${SUDO_LOG:?}" \
+    SUDO_VALIDATE_EXIT_CODE="${SUDO_VALIDATE_EXIT_CODE:-0}" \
+    ODS_UNINSTALL_SYSTEMD_DIR="$install_dir/systemd" \
         bash "$install_dir/ods-uninstall.sh" --force "$@" >/dev/null
 }
 
@@ -121,11 +138,13 @@ main() {
     local install_keep="$TMP_DIR/install-keep"
     local home_keep="$TMP_DIR/home-keep"
     local log_keep="$TMP_DIR/docker-keep.log"
+    local sudo_log="$TMP_DIR/sudo.log"
+    : > "$sudo_log"
     mkdir -p "$home_keep"
     make_install "$install_keep"
     mkdir -p "$home_keep/.local/bin"
     ln -s "$install_keep/ods-cli" "$home_keep/.local/bin/ods"
-    DOCKER_LOG="$log_keep" run_uninstall "$install_keep" "$home_keep" "$stub_dir" --keep-data
+    DOCKER_LOG="$log_keep" SUDO_LOG="$sudo_log" run_uninstall "$install_keep" "$home_keep" "$stub_dir" --keep-data
 
     grep -qF 'compose -f docker-compose.base.yml -f docker-compose.cpu.yml down --remove-orphans' "$log_keep" \
         || fail "uninstall must use saved .compose-flags for docker compose down"
@@ -142,11 +161,67 @@ main() {
     local log_purge="$TMP_DIR/docker-purge.log"
     mkdir -p "$home_purge"
     make_install "$install_purge"
-    DOCKER_LOG="$log_purge" run_uninstall "$install_purge" "$home_purge" "$stub_dir"
+    DOCKER_LOG="$log_purge" SUDO_LOG="$sudo_log" run_uninstall "$install_purge" "$home_purge" "$stub_dir"
 
     grep -qF 'compose -f docker-compose.base.yml -f docker-compose.cpu.yml down -v --remove-orphans' "$log_purge" \
         || fail "normal uninstall must remove compose volumes with -v"
     pass "normal uninstall removes compose volumes"
+
+    mapfile -t sudo_calls < "$sudo_log"
+    local sudo_credentials_seen=0
+    local sudo_chown_seen=0
+    local sudo_call
+    for sudo_call in "${sudo_calls[@]}"; do
+        if [[ "$sudo_call" == "-v" ]]; then
+            sudo_credentials_seen=1
+            continue
+        fi
+        [[ "$sudo_credentials_seen" -eq 1 ]] \
+            || fail "uninstall must acquire sudo credentials directly before privileged commands"
+        [[ "$sudo_call" == "-n -- "* ]] \
+            || fail "privileged uninstall commands must use cached credentials non-interactively"
+        if [[ "$sudo_call" == "-n -- chown -R "* ]]; then
+            sudo_chown_seen=1
+        fi
+    done
+    [[ "$sudo_credentials_seen" -eq 1 ]] \
+        || fail "uninstall must acquire sudo credentials directly before privileged commands"
+    [[ "$sudo_chown_seen" -eq 1 ]] \
+        || fail "privileged uninstall must chown retained data through cached sudo credentials"
+    pass "uninstall separates the interactive sudo prompt from privileged commands"
+
+    local install_noninteractive="$TMP_DIR/install-noninteractive"
+    local home_noninteractive="$TMP_DIR/home-noninteractive"
+    local log_noninteractive="$TMP_DIR/docker-noninteractive.log"
+    local sudo_noninteractive="$TMP_DIR/sudo-noninteractive.log"
+    local out_noninteractive="$TMP_DIR/uninstall-noninteractive.out"
+    local noninteractive_rc
+    mkdir -p "$home_noninteractive"
+    make_install "$install_noninteractive"
+    : > "$log_noninteractive"
+    : > "$sudo_noninteractive"
+    set +e
+    HOME="$home_noninteractive" \
+    INSTALL_DIR="$install_noninteractive" \
+    PATH="$stub_dir:$PATH" \
+    DOCKER_LOG="$log_noninteractive" \
+    SUDO_LOG="$sudo_noninteractive" \
+    SUDO_VALIDATE_EXIT_CODE=1 \
+        timeout 5s bash "$install_noninteractive/ods-uninstall.sh" \
+            --force --non-interactive >"$out_noninteractive" 2>&1
+    noninteractive_rc=$?
+    set -e
+    [[ "$noninteractive_rc" -ne 0 && "$noninteractive_rc" -ne 124 ]] \
+        || fail "non-interactive uninstall must fail promptly when sudo cannot authenticate (rc=$noninteractive_rc)"
+    [[ -d "$install_noninteractive" ]] \
+        || fail "failed non-interactive sudo preflight must not mutate the install tree"
+    [[ ! -s "$log_noninteractive" ]] \
+        || fail "failed non-interactive sudo preflight must happen before Docker cleanup"
+    grep -qx -- '-n -v' "$sudo_noninteractive" \
+        || fail "non-interactive uninstall must validate sudo without prompting"
+    grep -qF 'Non-interactive uninstall requires cached or passwordless sudo' "$out_noninteractive" \
+        || fail "non-interactive sudo failure must explain how to retry"
+    pass "non-interactive uninstall fails promptly and before mutation when sudo is unavailable"
 
     local install_safe="$TMP_DIR/install-safe-env"
     local home_safe="$TMP_DIR/home-safe-env"
@@ -156,7 +231,7 @@ main() {
     cat > "$install_safe/.env" <<'EOF'
 GPU_BACKEND=$(touch "$HOME/uninstall-env-sourced")
 EOF
-    DOCKER_LOG="$log_safe" run_uninstall "$install_safe" "$home_safe" "$stub_dir" --keep-data
+    DOCKER_LOG="$log_safe" SUDO_LOG="$sudo_log" run_uninstall "$install_safe" "$home_safe" "$stub_dir" --keep-data
 
     if [[ -e "$home_safe/uninstall-env-sourced" ]]; then
         fail "uninstall must not execute command substitutions from .env"
