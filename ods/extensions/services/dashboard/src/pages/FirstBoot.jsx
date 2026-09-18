@@ -257,9 +257,9 @@ export default function FirstBoot({ onComplete }) {
   }
 
   return (
-    <div className="pixel-app pixel-setup min-h-screen bg-theme-bg flex flex-col">
+    <div className="min-h-screen bg-theme-bg flex flex-col">
       <header className="px-6 pt-8 pb-4 flex items-center justify-between">
-        <img src="/osmantic-isolated-os.png" alt="ODS" className="h-12 w-20 object-contain grayscale mix-blend-screen" />
+        <div className="font-mono text-sm font-bold text-theme-accent tracking-widest">ODS</div>
         {!invite && <StepDots step={step} total={TOTAL_STEPS} />}
       </header>
 
@@ -425,7 +425,6 @@ function UserStep({ username, setUsername, onNext, onBack }) {
       <div className="flex gap-3">
         <button
           onClick={onBack}
-          aria-label="Back"
           className="flex items-center justify-center gap-2 bg-theme-card border border-theme-border text-theme-text py-4 px-5 rounded-xl"
         >
           <ChevronLeft size={18} />
@@ -466,15 +465,14 @@ function StackStep({ stack, setStack, onNext, onBack }) {
             <button
               key={opt.id}
               onClick={() => setStack(opt.id)}
-              aria-pressed={selected}
-              className={`w-full text-left p-4 rounded-xl border transition-colors flex gap-4 ${
+              className={`w-full text-left p-4 rounded-xl border-2 transition-colors flex gap-4 ${
                 selected
                   ? 'border-theme-accent bg-theme-accent/10'
                   : 'border-theme-border bg-theme-card hover:border-theme-text-muted'
               }`}
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                selected ? 'bg-theme-border text-theme-text' : 'bg-theme-border text-theme-text-muted'
+                selected ? 'bg-theme-accent text-white' : 'bg-theme-border text-theme-text-muted'
               }`}>
                 <Icon size={24} />
               </div>
@@ -493,7 +491,6 @@ function StackStep({ stack, setStack, onNext, onBack }) {
       <div className="flex gap-3">
         <button
           onClick={onBack}
-          aria-label="Back"
           className="flex items-center justify-center gap-2 bg-theme-card border border-theme-border text-theme-text py-4 px-5 rounded-xl"
         >
           <ChevronLeft size={18} />
@@ -567,7 +564,6 @@ function ConfirmStep({
       <div className="flex gap-3">
         <button
           onClick={onBack}
-          aria-label="Back"
           disabled={finishing}
           className="flex items-center justify-center gap-2 bg-theme-card border border-theme-border text-theme-text py-4 px-5 rounded-xl disabled:opacity-50"
         >

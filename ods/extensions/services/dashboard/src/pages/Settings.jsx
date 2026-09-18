@@ -1,6 +1,6 @@
-import MetalMetricIcon from '../components/MetalMetricIcon'
 import {
   Activity,
+  ArrowUpRight,
   Calendar,
   ChevronDown,
   ChevronRight,
@@ -16,21 +16,14 @@ import {
   RefreshCw,
   Route,
   Server,
+  Settings as SettingsIcon,
   UserPlus,
   WalletCards,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import EnvEditor from '../components/settings/EnvEditor'
-import PixelProviderSettings from '../components/settings/PixelProviderSettings.jsx'
-import PixelRuntimeSettings from '../components/settings/PixelRuntimeSettings.jsx'
-import PixelSharingSettings from '../components/settings/PixelSharingSettings.jsx'
-import PixelAccessCard from '../components/settings/PixelAccessCard'
-import AssistantIdentitySettings from '../components/settings/AssistantIdentitySettings'
 import { useTheme } from '../contexts/ThemeContext'
-import { WALLPAPERS } from '../lib/wallpapers'
-import CustomWallpaperPicker from '../components/CustomWallpaperPicker'
-import '../wallpaper-themes.css'
 import { dashboardHost, serviceUrl } from '../lib/serviceUrls'
 import {
   clearSettingsFollowUp,
@@ -54,7 +47,7 @@ const buildErrorFromResponse = async (response) => {
   try {
     const payload = await response.json()
     detail = payload?.detail ?? payload
-  } catch { /* Non-JSON errors retain the HTTP status below. */ }
+  } catch {}
   const error = new Error(typeof detail === 'string' ? detail : (detail?.message || `Request failed (${response.status})`))
   error.details = typeof detail === 'object' && detail ? detail : null
   return error
@@ -132,6 +125,13 @@ const routeFilterDotClass = {
   inactive: 'bg-red-400',
 }
 
+const THEME_SWATCHES = {
+  ods: 'linear-gradient(135deg, #9d00ff 0%, #18181b 100%)',
+  lemonade: 'linear-gradient(135deg, #facc15 0%, #fdfbf3 100%)',
+  light: 'linear-gradient(135deg, #60a5fa 0%, #ffffff 100%)',
+  arctic: 'linear-gradient(135deg, #38bdf8 0%, #f0f9ff 100%)',
+}
+
 const ROUTE_DESCRIPTIONS = {
   ape: 'Policy evaluation and enforcement',
   comfyui: 'Text-to-image and image generation',
@@ -159,8 +159,7 @@ const getServiceDescription = (service) => {
   return 'Service registered in the current ODS stack'
 }
 
-export default function Settings({ activeSection = 'all' }) {
-  const visible = id => activeSection === 'all' || activeSection === id
+export default function Settings() {
   const { theme, setTheme, themes, labels } = useTheme()
   const [version, setVersion] = useState(null)
   const [storage, setStorage] = useState(null)
@@ -181,7 +180,6 @@ export default function Settings({ activeSection = 'all' }) {
   const [statusCache, setStatusCache] = useState(null)
   const [setupStatus, setSetupStatus] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [routeFilter, setRouteFilter] = useState('all')
@@ -254,7 +252,7 @@ export default function Settings({ activeSection = 'all' }) {
           version: statusData.version || 'Unknown',
           install_date: formatInstallDate(statusData.install_date),
           tier: titleCase(statusData.tier || 'Community'),
-          uptime: Number.isFinite(statusData.uptime) && statusData.uptime >= 0 ? formatUptime(statusData.uptime) : 'Unknown',
+          uptime: formatUptime(statusData.uptime || 0),
         })
         setServices(statusData.services || [])
       } else failures.push(summaryResult.reason)
@@ -280,7 +278,6 @@ export default function Settings({ activeSection = 'all' }) {
       setError(getErrorText(err))
       console.error('Settings fetch error:', err)
     } finally {
-      setInitialized(true)
       setLoading(false)
     }
     void fetchVersionInfo()
@@ -356,7 +353,7 @@ export default function Settings({ activeSection = 'all' }) {
         services: data.services?.map(s => ({ name: s.name, port: s.port, status: s.status })),
         model: data.model,
       }
-      const blob = new globalThis.Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -387,54 +384,48 @@ export default function Settings({ activeSection = 'all' }) {
     return { online, degraded, inactive }
   }, [services])
 
-  // A system refresh must not unmount the independently edited provider form.
-  if (loading && !initialized) return <SettingsSkeleton />
+  if (loading) return <SettingsSkeleton />
 
   return (
-    <div className={`settings-refined min-h-full ${activeSection === 'all' ? 'px-3 py-6 sm:px-4 lg:px-5 xl:px-6' : 'settings-single-section'}`}>
-      <div hidden={activeSection !== 'all'}><SettingsPageHeader
+    <div className="min-h-full px-3 py-6 sm:px-4 lg:px-5 xl:px-6">
+      <SettingsPageHeader
         onRefresh={() => fetchSettings({ preserveEnvChanges: envDirty })}
         onCheckUpdates={() => {
           setNotice({ type: 'info', text: 'Checking for updates...' })
           void fetchVersionInfo({ announce: true })
         }}
         onOpenEnvironment={handleOpenEnvironmentEditor}
-      /></div>
+      />
 
       {error ? <Banner tone="danger">{error} - <button className="underline" onClick={fetchSettings}>Retry</button></Banner> : null}
       {notice ? <Banner tone={notice.type} onClose={() => setNotice(null)}>{notice.text}</Banner> : null}
 
       <div className="w-full space-y-5">
-        <div hidden={!['all','general','appearance','usage','owner'].includes(activeSection)} className="grid items-stretch gap-4 xl:grid-cols-12">
-          <div hidden={!visible('general')}><SystemIdentityCard version={version} /></div>
-          <div hidden={!visible('appearance')}><AppearanceCard showHeading={activeSection === 'all'} theme={theme} themes={themes} labels={labels} onThemeChange={setTheme} /></div>
-          <div hidden={!visible('usage')}><AccountUsageCard usageReport={usageReport} /></div>
-          <div hidden={!visible('owner')}><RemoteSetupCard setupStatus={setupStatus} /></div>
+        <div className="grid items-stretch gap-4 xl:grid-cols-12">
+          <SystemIdentityCard version={version} className="xl:col-span-7" />
+          <AppearanceCard theme={theme} themes={themes} labels={labels} onThemeChange={setTheme} className="xl:col-span-5" />
+          <AccountUsageCard usageReport={usageReport} className="xl:col-span-7" />
+          <RemoteSetupCard setupStatus={setupStatus} className="xl:col-span-5" />
         </div>
-        {activeSection === 'all' && <AssistantIdentitySettings />}
-        <div hidden={!visible('connections')}><PixelProviderSettings showHeading={activeSection === 'all'} /></div>
-        <div hidden={!visible('connections')}><details className="settings-agent-behavior"><summary>Agent behavior</summary><PixelRuntimeSettings /></details></div>
-        <div hidden={!visible('sharing')}><PixelSharingSettings /></div>
-        <div hidden={!visible('access')}><PixelAccessCard showHeading={activeSection === 'all'} /></div>
-        <div hidden={!visible('services')}><RoutingTableCard
+        <RoutingTableCard
           services={services}
           counts={routeCounts}
           routeFilter={routeFilter}
           onRouteFilterChange={setRouteFilter}
           expanded={routesExpanded}
           onToggleExpanded={() => setRoutesExpanded(current => !current)}
-        /></div>
+        />
 
-        <div hidden={!['all','storage','updates'].includes(activeSection) && !(activeSection === 'advanced' && !envOpen)} className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(22rem,0.85fr)]">
-          <div hidden={!visible('storage')}><StorageCard storage={storage} showHeading={activeSection === 'all'} /></div>
-          <div hidden={!['all','updates','advanced'].includes(activeSection)} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-            <div hidden={!visible('updates')}><UpdatesCard version={version} showHeading={activeSection === 'all'} onCheckUpdates={() => fetchVersionInfo({ announce: true })} /></div>
-            <div hidden={!visible('advanced')} className="settings-advanced-tools"><CommandsCard onExportConfig={handleExportConfig} />{!envOpen && <button className="settings-open-editor" onClick={handleOpenEnvironmentEditor}>Open environment editor</button>}</div>
+        <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(22rem,0.85fr)]">
+          <StorageCard storage={storage} />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            <UpdatesCard version={version} onCheckUpdates={() => fetchVersionInfo({ announce: true })} />
+            <CommandsCard onExportConfig={handleExportConfig} />
           </div>
         </div>
 
         {envOpen && envEditor ? (
-          <div hidden={!visible('advanced')} ref={envEditorRef}>
+          <div ref={envEditorRef} className="pt-4">
             <EnvEditor
               editor={envEditor}
               search={envSearch}
@@ -458,7 +449,6 @@ export default function Settings({ activeSection = 'all' }) {
               onReload={() => fetchEnvEditor({ announce: true })}
               onSave={handleSaveEnv}
               onApply={handleApplyEnv}
-              onExport={handleExportConfig}
               dirty={envDirty}
               saving={envSaving}
               applyPlan={envApplyPlan}
@@ -508,39 +498,40 @@ function SystemIdentityCard({ version, className = '' }) {
         <MetaTile icon={Server} label="Version" value={currentVersion} badge={versionBadge} />
         <MetaTile icon={Calendar} label="Install Date" value={version?.install_date || 'Unknown'} />
         <MetaTile icon={Crown} label="Tier" value={version?.tier || 'Community'} />
-        <MetaTile icon={Clock3} label="Uptime" value={version?.uptime || 'Unknown'} />
+        <MetaTile icon={Clock3} label="Uptime" value={version?.uptime || 'Unknown'} live />
       </div>
     </PremiumCard>
   )
 }
 
-function AppearanceCard({ theme, themes, labels, onThemeChange, className = '', showHeading = true }) {
-  const {wallpapers = WALLPAPERS} = useTheme()
+function AppearanceCard({ theme, themes, labels, onThemeChange, className = '' }) {
   return (
     <PremiumCard className={`p-5 lg:p-6 ${className}`}>
-      {showHeading && <CardIntro icon={Palette} title="Appearance" description="Pixel’s minimal interface is shared across ODS." />}
-      <div className="wallpaper-intro"><h3>Make it yours</h3><p>Pixel by default. A different atmosphere when you want it.</p></div>
-      <div className="wallpaper-gallery" aria-label="Workspace themes">
+      <CardIntro icon={Palette} title="Appearance" description="Choose how the dashboard appears on this browser." />
+      <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-theme-border bg-theme-border">
         {themes.map(themeId => (
           <button
             key={themeId}
             type="button"
-            aria-label={labels[themeId] || themeId}
             aria-pressed={theme === themeId}
             onClick={() => onThemeChange(themeId)}
-            className="wallpaper-choice"
+            className={`flex min-h-14 items-center justify-between gap-3 bg-theme-bg/40 px-4 text-sm font-semibold transition-colors ${
+              theme === themeId
+                ? 'text-theme-accent-light shadow-[inset_3px_0_0_rgb(var(--theme-accent))]'
+                : 'text-theme-text-muted hover:bg-theme-surface-hover hover:text-theme-text'
+            }`}
           >
-            <span className="wallpaper-thumbnail">
-              {wallpapers.find(item => item.id === themeId)?.image && <img src={wallpapers.find(item => item.id === themeId).image} alt="" loading="lazy"/>}
-              <span className="wallpaper-mini-sidebar"><i/><i/><i/></span><span className="wallpaper-mini-chat"><i/><i/></span>
-              {theme === themeId && <span className="wallpaper-check" aria-hidden="true">✓</span>}
+            <span className="flex items-center gap-2.5">
+              <span
+                className="h-3 w-3 shrink-0 rounded-full border border-theme-border"
+                style={{ background: THEME_SWATCHES[themeId] || 'rgb(var(--theme-accent))' }}
+              />
+              <span>{labels[themeId] || themeId}</span>
             </span>
-            <span className="wallpaper-caption"><span>{labels[themeId] || themeId}</span>{themeId === 'ods' ? <small>Default</small> : wallpapers.find(item => item.id === themeId)?.kind === 'video' && <small>Video</small>}</span>
+            <span className={`h-1.5 w-1.5 rounded-full ${theme === themeId ? 'bg-theme-accent-light' : 'bg-transparent'}`} />
           </button>
         ))}
       </div>
-      <p className="wallpaper-note">Applied instantly · saved in this browser. Wallpapers add frosted glass without changing your layout.</p>
-      <CustomWallpaperPicker />
     </PremiumCard>
   )
 }
@@ -615,35 +606,45 @@ function RoutingTableCard({ services, counts, routeFilter, onRouteFilterChange, 
   const hiddenCount = Math.max(filteredRoutes.length - visibleRoutes.length, 0)
 
   return (
-    <PremiumCard className="settings-routes">
-      <div className="settings-route-intro">
+    <PremiumCard className="grid overflow-hidden lg:grid-cols-[340px_1fr]">
+      <div className="border-b border-theme-border p-5 lg:border-b-0 lg:border-r lg:p-6">
         <CardIntro icon={Route} title="Routing Table" description="Overview of route surfaces and their current status." />
-        <p className="settings-route-host">{dashboardHost()} <span>· {services.length} routes</span></p>
+        <div className="mt-9">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-theme-text-muted">Route Surfaces</p>
+          <div className="mt-3 inline-flex items-center gap-3 rounded-full border border-theme-border bg-theme-accent/10 px-4 py-2 text-sm text-theme-text">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              {dashboardHost()}
+          </div>
+        </div>
       </div>
-      <div>
-        <div className="settings-route-toolbar">
-          <div className="settings-route-filters" role="group" aria-label="Filter routes">
+      <div className="p-5 lg:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap gap-2">
             {['all', 'online', 'degraded', 'inactive'].map(item => (
               <button
                 key={item}
                 type="button"
                 onClick={() => onRouteFilterChange(item)}
-                aria-pressed={routeFilter === item}
-                className="settings-route-filter"
+                className={`rounded-full border px-4 py-2 text-sm capitalize transition-colors ${
+                  routeFilter === item
+                    ? 'border-theme-accent bg-theme-accent text-white shadow-[0_0_26px_rgba(157,0,255,0.28)]'
+                    : 'border-theme-border bg-theme-card text-theme-text-muted hover:bg-theme-surface-hover hover:text-theme-text'
+                }`}
               >
                 {item}
               </button>
             ))}
           </div>
-          <div>
-            <Link to="/extensions/integrations" className="settings-inline-action">
+          <div className="flex items-center gap-4">
+            <p className="text-sm text-theme-text-muted">{services.length} routes total</p>
+            <Link to="/extensions/integrations" className="inline-flex items-center gap-2 rounded-lg border border-theme-border bg-theme-card px-4 py-2 text-sm text-theme-text hover:border-theme-accent/50">
               View All Routes
               <ChevronRight size={15} />
             </Link>
           </div>
         </div>
 
-        <div className="settings-route-summary">
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
           <RouteStatusCard tone="online" label="Online" count={counts.online.length} description="Healthy services in the current status cache" />
           <RouteStatusCard tone="degraded" label="Degraded" count={counts.degraded.length} description="Services reporting degraded health" />
           <RouteStatusCard tone="inactive" label="Inactive" count={counts.inactive.length} description="Down, unhealthy, or unknown services" />
@@ -654,15 +655,16 @@ function RoutingTableCard({ services, counts, routeFilter, onRouteFilterChange, 
             <span className={`h-2 w-2 rounded-full ${routeFilter === 'all' ? 'bg-theme-accent' : routeFilterDotClass[routeFilter]}`} />
             {routeFilter === 'all' ? 'All Routes' : `${titleCase(routeFilter)} Routes`}
           </p>
-          <div className="settings-route-list">
+          <div className="overflow-hidden rounded-lg border border-theme-border bg-theme-bg/30">
             {visibleRoutes.length > 0 ? visibleRoutes.map(service => (
               <RouteRow key={`${service.id || service.name}-${service.port || 'internal'}`} service={service} />
             )) : (
               <div className="px-5 py-6 text-sm text-theme-text-muted">No routes match this filter.</div>
             )}
-            {filteredRoutes.length > 4 ? (
+            {hiddenCount > 0 ? (
               <button type="button" onClick={onToggleExpanded} className="flex w-full items-center gap-3 border-t border-theme-border px-5 py-3 text-left text-sm text-theme-text-muted hover:bg-theme-surface-hover hover:text-theme-text">
-                {expanded ? 'Show fewer routes' : `${hiddenCount} more routes`}
+                <span className="text-lg leading-none">+</span>
+                {hiddenCount} more routes
                 <ChevronDown size={15} className={expanded ? 'rotate-180' : ''} />
               </button>
             ) : null}
@@ -673,7 +675,7 @@ function RoutingTableCard({ services, counts, routeFilter, onRouteFilterChange, 
   )
 }
 
-function StorageCard({ storage, showHeading = true }) {
+function StorageCard({ storage }) {
   const totalDataGb = Math.max(Number(storage?.total_data?.gb) || 0, 0)
   const modelsGb = Math.max(Number(storage?.models?.gb) || 0, 0)
   const vectorGb = Math.max(Number(storage?.vector_db?.gb) || 0, 0)
@@ -688,9 +690,9 @@ function StorageCard({ storage, showHeading = true }) {
   ]
 
   return (
-    <UtilityCard icon={HardDrive} title="Storage" showHeading={showHeading} description="Persistent ODS data and host disk capacity.">
-      <div className="settings-storage-overview">
-        <div className="settings-storage-data">
+    <UtilityCard icon={HardDrive} title="Storage" description="Persistent ODS data and host disk capacity.">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-theme-border bg-theme-bg/30 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-theme-text-muted">ODS data</p>
@@ -706,7 +708,7 @@ function StorageCard({ storage, showHeading = true }) {
           </div>
         </div>
 
-        <div className="settings-storage-disk">
+        <div className="rounded-lg border border-theme-border bg-theme-bg/30 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-theme-text-muted">Host disk</p>
@@ -725,12 +727,12 @@ function StorageCard({ storage, showHeading = true }) {
         </div>
       </div>
 
-      <div className="settings-storage-breakdown">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {items.map(([label, value]) => (
-          <div key={label} className="settings-storage-row">
+          <div key={label} className="rounded-lg border border-theme-border bg-theme-bg/20 px-4 py-3">
             <p className="text-xs text-theme-text-muted">{label}</p>
             <p className="mt-1 text-base font-semibold text-theme-text">{value > 0 ? formatStorageGb(value) : 'Empty'}</p>
-            <div className="settings-storage-track h-1.5 overflow-hidden rounded-full bg-theme-border/65">
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-theme-border/65">
               <div
                 className="h-full rounded-full bg-theme-accent/75"
                 style={{ width: `${totalDataGb > 0 ? clampPercent((value / totalDataGb) * 100) : 0}%` }}
@@ -747,7 +749,7 @@ function StorageCard({ storage, showHeading = true }) {
   )
 }
 
-function UpdatesCard({ version, onCheckUpdates, showHeading = true }) {
+function UpdatesCard({ version, onCheckUpdates }) {
   const checkedAt = formatCheckedAt(version?.checked_at)
   const updateText = version?.update_check_ok
     ? (version?.update_available ? 'Update available' : 'Current release')
@@ -758,7 +760,7 @@ function UpdatesCard({ version, onCheckUpdates, showHeading = true }) {
       <div className="flex items-start gap-3">
         <RefreshCw size={19} strokeWidth={1.8} className="mt-0.5 shrink-0 text-theme-accent-light" />
         <div className="min-w-0">
-          {showHeading && <h2 className="text-base font-semibold text-theme-text">Updates</h2>}
+          <h2 className="text-base font-semibold text-theme-text">Updates</h2>
           <p className="mt-0.5 truncate text-xs text-theme-text-muted">
             {checkedAt ? `Checked ${checkedAt}` : 'Release status has not been checked.'}
           </p>
@@ -782,16 +784,26 @@ function UpdatesCard({ version, onCheckUpdates, showHeading = true }) {
 
 function CommandsCard({ onExportConfig }) {
   return (
-      <button type="button" onClick={onExportConfig} className="settings-export-config">
+    <PremiumCard className="flex min-h-0 flex-col justify-between p-4">
+      <div className="flex items-start gap-3">
+        <SettingsIcon size={19} strokeWidth={1.8} className="mt-0.5 shrink-0 text-theme-accent-light" />
+        <div>
+          <h2 className="text-base font-semibold text-theme-text">Commands</h2>
+          <p className="mt-0.5 text-xs text-theme-text-muted">Portable operational metadata.</p>
+        </div>
+      </div>
+      <button type="button" onClick={onExportConfig} className="mt-4 flex w-full items-center justify-between border-t border-theme-border pt-3 text-left text-sm font-medium text-theme-text hover:text-theme-accent-light">
         <span className="flex items-center gap-2"><Download size={16} />Export configuration</span>
+        <ArrowUpRight size={15} className="text-theme-text-muted" />
       </button>
+    </PremiumCard>
   )
 }
 
 function CardIntro({ icon: Icon, title, description }) {
   return (
-    <div className="settings-section-intro flex min-w-0 items-start gap-3.5">
-      <MetalMetricIcon icon={Icon} size={18} className="mt-0.5 shrink-0" />
+    <div className="flex min-w-0 items-start gap-3.5">
+      <Icon size={21} strokeWidth={1.8} className="mt-0.5 shrink-0 text-theme-accent-light" />
       <div>
         <h2 className="text-lg font-semibold text-theme-text">{title}</h2>
         <p className="mt-1 max-w-md text-sm leading-5 text-theme-text-muted">{description}</p>
@@ -802,7 +814,7 @@ function CardIntro({ icon: Icon, title, description }) {
 
 function MetaTile({ icon: Icon, label, value, badge, live = false }) {
   return (
-    <div className="settings-meta-row min-w-0 px-4 first:pl-0 sm:border-r sm:border-theme-border sm:last:border-r-0 2xl:first:pl-0">
+    <div className="min-w-0 px-4 first:pl-0 sm:border-r sm:border-theme-border sm:last:border-r-0 2xl:first:pl-0">
       <div className="mb-2 flex items-center gap-2 text-theme-text-muted">
         <Icon size={16} strokeWidth={1.8} />
         <span className="text-[11px] font-semibold uppercase tracking-[0.2em]">{label}</span>
@@ -818,7 +830,7 @@ function MetaTile({ icon: Icon, label, value, badge, live = false }) {
 
 function MetricTile({ icon: Icon, label, value, delta }) {
   return (
-    <div className="settings-metric-row min-w-0">
+    <div className="min-w-0 border-theme-border 2xl:border-l 2xl:pl-5 2xl:first:border-l-0 2xl:first:pl-0">
       <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-theme-text-muted"><Icon size={14} />{label}</p>
       <div className="mt-2 flex items-baseline gap-2">
         <p className="text-xl font-semibold text-theme-text">{value}</p>
@@ -829,13 +841,19 @@ function MetricTile({ icon: Icon, label, value, delta }) {
 }
 
 function RouteStatusCard({ tone, label, count, description }) {
+  const palette = {
+    online: 'border-emerald-400/25 text-emerald-300 shadow-[inset_3px_0_0_rgba(52,211,153,0.55)]',
+    degraded: 'border-amber-400/25 text-amber-300 shadow-[inset_3px_0_0_rgba(251,191,36,0.75)]',
+    inactive: 'border-red-400/25 text-red-300 shadow-[inset_3px_0_0_rgba(248,113,113,0.65)]',
+  }
   return (
-    <div className="settings-route-count" title={description}>
-      <div className="flex items-center gap-2">
+    <div className={`rounded-lg border bg-theme-bg/30 p-5 ${palette[tone]}`}>
+      <div className="mb-3 flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${tone === 'online' ? 'bg-emerald-400' : tone === 'degraded' ? 'bg-amber-400' : 'bg-red-400'}`} />
         <p className="text-sm font-semibold">{label}</p>
       </div>
-      <p className="text-theme-text">{count}<span className="sr-only"> routes — {description}</span></p>
+      <p className="text-3xl font-semibold text-theme-text">{count}<span className="ml-2 text-sm font-normal text-theme-text-muted">routes</span></p>
+      <p className="mt-2 text-sm text-theme-text-muted">{description}</p>
     </div>
   )
 }
@@ -856,23 +874,23 @@ function RouteRow({ service }) {
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-4">
-        <span className="settings-route-port">
+        <span className="rounded-lg border border-theme-accent/35 bg-theme-accent/10 px-3 py-1 font-mono text-sm text-theme-accent-light">
           {service.port ? `:${service.port}` : 'internal'}
         </span>
         <ChevronRight size={18} className="text-theme-text-muted" />
       </div>
     </>
   )
-  const className = "settings-route-row flex items-center justify-between gap-4 border-b border-theme-border py-3 last:border-b-0 hover:bg-theme-surface-hover"
+  const className = "flex items-center justify-between gap-4 border-b border-theme-border px-5 py-3 last:border-b-0 hover:bg-theme-surface-hover"
   return href
     ? <a href={href} target="_blank" rel="noopener noreferrer" className={className}>{content}</a>
     : <div className={className}>{content}</div>
 }
 
-function UtilityCard({ icon: Icon, title, description, children, showHeading = true }) {
+function UtilityCard({ icon: Icon, title, description, children }) {
   return (
     <PremiumCard className="p-5">
-      <div className="mb-5" hidden={!showHeading}>
+      <div className="mb-5">
         <CardIntro icon={Icon} title={title} description={description} />
       </div>
       {children}
@@ -883,7 +901,7 @@ function UtilityCard({ icon: Icon, title, description, children, showHeading = t
 function PremiumCard({ as: Component = 'div', className = '', children, ...props }) {
   return (
     <Component
-      className={`settings-premium-card settings-section ${className}`}
+      className={`settings-premium-card liquid-metal-frame liquid-metal-frame--soft rounded-lg border ${className}`}
       {...props}
     >
       {children}

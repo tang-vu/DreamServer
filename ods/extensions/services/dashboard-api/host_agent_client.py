@@ -129,27 +129,12 @@ def _get_sync_client() -> httpx.Client:
 async def _get_async_client() -> httpx.AsyncClient:
     global _async_client
 
-    loop = asyncio.get_running_loop()
     client = _async_client
-    owner_loop = getattr(client, "_ods_owner_loop", None) if client is not None else None
-    if (
-        client is not None
-        and not client.is_closed
-        and (owner_loop is None or owner_loop is loop)
-    ):
-        # Tests and explicit adapters may inject a client. Adopt it into the
-        # current loop the first time rather than treating it as stale.
-        if owner_loop is None:
-            setattr(client, "_ods_owner_loop", loop)
+    if client is not None and not client.is_closed:
         return client
     with _async_client_lock:
         client = _async_client
-        owner_loop = getattr(client, "_ods_owner_loop", None) if client is not None else None
-        if (
-            client is None
-            or client.is_closed
-            or owner_loop is not None and owner_loop is not loop
-        ):
+        if client is None or client.is_closed:
             _async_client = httpx.AsyncClient(
                 base_url=AGENT_URL,
                 headers=_headers(),
@@ -157,7 +142,6 @@ async def _get_async_client() -> httpx.AsyncClient:
                 timeout=_timeout(5.0),
                 trust_env=False,
             )
-            setattr(_async_client, "_ods_owner_loop", loop)
         return _async_client
 
 

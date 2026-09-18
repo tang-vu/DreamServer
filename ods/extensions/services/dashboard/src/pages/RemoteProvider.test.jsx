@@ -21,9 +21,6 @@ const statusPayload = {
       baseUrl: 'http://127.0.0.1:8000/v1',
       model: 'qwen/remote:latest',
       transport: 'ssh',
-      contextLength: 32768,
-      maxTokens: 4096,
-      reasoning: false,
     },
     projection: {
       publicModel: 'ods/current',
@@ -45,19 +42,6 @@ const statusPayload = {
       },
     },
     errors: [],
-  },
-  activation: {
-    valid: true,
-    active: true,
-    proven: true,
-    reason: 'active_and_proven',
-    gateway: 'litellm-cloud',
-    publicModel: 'ods/current',
-    model: 'qwen/remote:latest',
-    contextLength: 32768,
-    maxTokens: 4096,
-    reasoning: false,
-    pixel: 'reconciled',
   },
   peer: {
     configured: false,
@@ -92,29 +76,8 @@ const statusPayload = {
   availableActions: {
     configure: true,
     test: true,
-    enable: false,
     disable: true,
     remove: true,
-  },
-}
-
-const driftedStatusPayload = {
-  ...statusPayload,
-  status: 'degraded',
-  activation: {
-    ...statusPayload.activation,
-    valid: false,
-    proven: false,
-    reason: 'consumer_drift',
-    pixel: 'drifted',
-  },
-  capabilities: {
-    ...statusPayload.capabilities,
-    inference: false,
-  },
-  availableActions: {
-    ...statusPayload.availableActions,
-    enable: true,
   },
 }
 
@@ -223,9 +186,6 @@ const configurePlanPayload = {
       baseUrl: 'https://gpu.example.test/v1',
       model: 'qwen/remote:latest',
       transport: 'direct',
-      contextLength: 32768,
-      maxTokens: 4096,
-      reasoning: false,
     },
   },
   writes: {
@@ -246,13 +206,6 @@ const configureApplyPayload = {
   applied: true,
   mutated: true,
   rollback: { attempted: false, ok: null },
-  activation: {
-    active: true,
-    proven: true,
-    publicModel: 'ods/current',
-    model: 'qwen/remote:latest',
-    pixel: 'reconciled',
-  },
   probe: {
     ok: true,
     endpoint: '/v1/models',
@@ -297,12 +250,6 @@ const disableApplyPayload = {
     removesSecrets: false,
   },
   secretRefs: {},
-}
-
-const enableApplyPayload = {
-  ...disableApplyPayload,
-  action: 'enable',
-  route: { enabled: true },
 }
 
 const removeApplyPayload = {
@@ -354,22 +301,6 @@ test('renders remote provider status and proof receipt', async () => {
   expect(screen.getByRole('button', { name: /test route/i })).toBeEnabled()
 })
 
-test('compact views keep the connection draft and never apply changes on navigation', async () => {
-  globalThis.fetch.mockResolvedValue(response(statusPayload))
-  render(createElement(RemoteProvider, { compact: true }))
-  await screen.findByRole('button', { name: 'Connection', exact: true })
-  expect(screen.queryByRole('heading', { name: 'Egress' })).toBeNull()
-  fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'https://draft.example/v1' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Diagnostics', exact: true }))
-  expect(screen.getByRole('heading', { name: 'Egress' })).toBeVisible()
-  expect(screen.queryByRole('textbox', { name: 'Base URL' })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'Peer models', exact: true }))
-  expect(screen.getByRole('heading', { name: 'ODS Peer Models' })).toBeVisible()
-  fireEvent.click(screen.getByRole('button', { name: 'Connection', exact: true }))
-  expect(screen.getByLabelText('Base URL')).toHaveValue('https://draft.example/v1')
-  expect(globalThis.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
-})
-
 test('runs configured route probe and shows proof recording result', async () => {
   globalThis.fetch
     .mockResolvedValueOnce(response(statusPayload))
@@ -411,9 +342,6 @@ test('plans direct provider configuration without rendering secret material', as
       transport: 'direct',
       baseUrl: 'https://gpu.example.test/v1',
       model: 'qwen/remote:latest',
-      contextLength: 32768,
-      maxTokens: 4096,
-      reasoning: false,
     },
     secrets: {
       apiKey: 'unit-test-provider-token',
@@ -468,28 +396,6 @@ test('applies disable lifecycle action and refreshes status', async () => {
   })
   expect(requestBody(1)).toEqual({ action: 'disable' })
   expect(screen.getByText('Disable applied')).toBeInTheDocument()
-})
-
-test('offers one-click reconciliation when the active consumer drifted', async () => {
-  globalThis.fetch
-    .mockResolvedValueOnce(response(driftedStatusPayload))
-    .mockResolvedValueOnce(response(enableApplyPayload))
-    .mockResolvedValueOnce(response(statusPayload))
-
-  render(createElement(RemoteProvider))
-
-  expect(await screen.findByText(/ODS and Pixel are not using its exact model contract/i)).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /^reconcile route$/i }))
-
-  await waitFor(() => {
-    expect(globalThis.fetch.mock.calls.map(call => call[0])).toEqual([
-      '/api/remote-provider/status',
-      '/api/remote-provider/apply',
-      '/api/remote-provider/status',
-    ])
-  })
-  expect(requestBody(1)).toEqual({ action: 'enable' })
-  expect(screen.getByText('Enable applied')).toBeInTheDocument()
 })
 
 test('confirms remove before deleting route state and stored secrets', async () => {

@@ -1,9 +1,6 @@
 services:
   litellm:
-    # v1.90.7 closes the upstream provider stream when a client disconnects,
-    # so Pixel Stop releases the exact llama.cpp request instead of decoding
-    # into a dead socket. Pin the reviewed multi-arch manifest, not just a tag.
-    image: ghcr.io/berriai/litellm:v1.90.7@sha256:917d480b7e4a7e61822e54f70be5c7cf753fb0b7328cbf6467612652ca748075
+    image: ghcr.io/berriai/litellm:v1.81.3-stable
     container_name: ods-litellm
     restart: unless-stopped
     security_opt:
@@ -16,7 +13,7 @@ services:
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
       - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
       - ODS_MODE=${ODS_MODE:-local}
-      - ODS_MODEL_SWITCHBOARD=${ODS_MODEL_SWITCHBOARD:-enabled}
+      - ODS_MODEL_SWITCHBOARD=${ODS_MODEL_SWITCHBOARD:-observe}
       - TOKEN_SPY_URL=${TOKEN_SPY_URL:-http://token-spy:8080}
       - TOKEN_SPY_API_KEY=${TOKEN_SPY_API_KEY:-}
     volumes:

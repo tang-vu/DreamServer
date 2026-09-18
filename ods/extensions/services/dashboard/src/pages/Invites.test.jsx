@@ -23,7 +23,7 @@ describe('Invites', () => {
     vi.restoreAllMocks()
   })
 
-  test('renders Owner access and revokes active owner cards', async () => {
+  test('renders Setup / Owner first and revokes active owner cards', async () => {
     let listCount = 0
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (url === '/api/auth/magic-link/list') {
@@ -57,8 +57,8 @@ describe('Invites', () => {
 
     render(<Invites />)
 
-    expect(await screen.findByRole('heading', { name: 'Owner access' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Owner cards' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Setup / Owner' })).toBeInTheDocument()
+    expect(screen.getByText('Factory owner card')).toBeInTheDocument()
     expect(screen.getAllByText('owner').length).toBeGreaterThan(0)
     expect(screen.getByText('revoke-only')).toBeInTheDocument()
 
@@ -103,7 +103,7 @@ describe('Invites', () => {
     render(<Invites />)
 
     await screen.findByText('No owner cards yet')
-    fireEvent.click(screen.getByRole('button', { name: 'Print owner card' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create owner card' }))
     fireEvent.change(screen.getByPlaceholderText('alice'), { target: { value: 'mike' } })
     fireEvent.click(screen.getByRole('button', { name: 'Generate owner QR' }))
 
@@ -151,7 +151,7 @@ describe('Invites', () => {
     render(<Invites />)
 
     await screen.findByText('No owner cards yet')
-    fireEvent.click(screen.getByRole('button', { name: 'Print owner card' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create owner card' }))
     fireEvent.change(screen.getByPlaceholderText('alice'), { target: { value: 'mike' } })
     fireEvent.click(screen.getByRole('button', { name: 'Generate owner QR' }))
 
@@ -196,7 +196,7 @@ describe('Invites', () => {
     render(<Invites />)
 
     await screen.findByText('No guest invites yet')
-    fireEvent.click(screen.getByRole('button', { name: 'New guest invite' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create guest invite' }))
     fireEvent.change(screen.getByPlaceholderText('alice'), { target: { value: 'bob' } })
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
 
@@ -248,6 +248,29 @@ describe('Invites', () => {
 
     expect(await screen.findByText(/ODS Talk owner cards require ods-proxy/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Print owner card' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'New guest invite' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Create owner card' })).toBeDisabled()
   })
+})
+
+test('searches access inventory and combines lifecycle filters without mutating credentials', async () => {
+  const tokens = [
+    { token_hash_prefix: 'owner-id', target_username: 'Alice', token_type: 'owner', note: 'Factory North', expires_at: null, redemption_count: 2, reusable: true },
+    { token_hash_prefix: 'guest-id', target_username: 'Bob', note: 'Workshop', expires_at: '2000-01-01T00:00:00Z', redemption_count: 0 },
+    { token_hash_prefix: 'revoked-id', target_username: 'Carol', revoked_at: future, redemption_count: 0 },
+  ]
+  const fetchMock = vi.fn(async url => response(url === '/api/auth/magic-link/list' ? { tokens } : ownerCardReady))
+  vi.stubGlobal('fetch', fetchMock)
+  render(<Invites />)
+  await screen.findByText('Alice')
+  fireEvent.change(screen.getByLabelText('Search access links'), { target: { value: 'factory north' } })
+  expect(screen.getByText('Alice')).toBeInTheDocument()
+  expect(screen.queryByText('Bob')).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Access link status'), { target: { value: 'expired' } })
+  expect(screen.getByText('Showing 0 of 3 access links')).toBeInTheDocument()
+  expect(screen.queryByText('No owner cards yet')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+  fireEvent.change(screen.getByLabelText('Access link status'), { target: { value: 'used' } })
+  expect(screen.getByText('Alice')).toBeInTheDocument()
+  expect(screen.queryByText('Carol')).not.toBeInTheDocument()
+  expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true)
 })

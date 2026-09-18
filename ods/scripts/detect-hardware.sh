@@ -76,8 +76,7 @@ in_container() {
 
 # Detect if inside WSL2
 is_wsl() {
-    local version_file="${ODS_PROC_VERSION_FILE:-/proc/version}"
-    [[ -f "$version_file" ]] && grep -qi microsoft "$version_file" 2>/dev/null
+    [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null
 }
 
 # Colors
@@ -137,30 +136,14 @@ detect_nvidia() {
     # which may be installed without NVIDIA hardware (e.g. nvidia-container-toolkit
     # on AMD-only systems).
     local _has_nvidia=false
-    local _drm_sys="${ODS_DRM_SYS:-/sys/class/drm}"
-    local _v
-    for _v in "$_drm_sys"/card*/device/vendor; do
-        [[ -f "$_v" ]] || continue
+    for _v in /sys/class/drm/card*/device/vendor; do
         [[ "$(cat "$_v" 2>/dev/null)" == "0x10de" ]] && _has_nvidia=true && break
     done
-
-    # WSL2 exposes the host GPU through its paravirtualized nvidia-smi bridge,
-    # but normally does not expose a matching /sys/class/drm vendor node. A
-    # successful, non-empty query is therefore the hardware witness on WSL;
-    # merely finding an installed nvidia-smi binary is not sufficient.
-    if ! $_has_nvidia && is_wsl && command -v nvidia-smi &>/dev/null; then
-        local _wsl_gpu_name=""
-        _wsl_gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null | first_line | xargs || true)
-        [[ -n "$_wsl_gpu_name" ]] && _has_nvidia=true
-    fi
     $_has_nvidia || return 1
 
-    # Works on bare metal Linux and via the WSL2 NVIDIA bridge.
+    # Works on bare metal Linux; on WSL2 it may be present via Docker Desktop GPU integration.
     if command -v nvidia-smi &>/dev/null; then
-        local _gpu_row=""
-        _gpu_row=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>/dev/null | first_line || true)
-        [[ -n "$_gpu_row" ]] || return 1
-        printf '%s\n' "$_gpu_row"
+        nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>/dev/null | first_line
     fi
 }
 

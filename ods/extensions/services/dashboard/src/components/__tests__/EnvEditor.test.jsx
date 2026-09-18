@@ -56,16 +56,6 @@ const renderEditor = (overrides = {}) =>
   )
 
 describe('EnvEditor', () => {
-  test('offers compact category navigation and search without behavior cards', () => {
-    const onSearchChange = vi.fn(), onSectionChange = vi.fn()
-    renderEditor({ onSearchChange, onSectionChange, sections: [...baseSections, { id: 'ports', title: 'Ports', keys: [] }] })
-    fireEvent.click(screen.getByRole('combobox', { name: 'Configuration category' }))
-    fireEvent.click(screen.getByRole('option', { name: 'Ports · 0' }))
-    expect(onSectionChange).toHaveBeenCalledWith('ports')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Filter configuration fields' }), { target: { value: 'model' } })
-    expect(onSearchChange).toHaveBeenCalledWith('model')
-    expect(screen.queryByText(/Save Behavior|Restart Behavior|Apply Behavior/)).toBeNull()
-  })
   test('renders stored secrets as masked placeholders instead of exposing values', () => {
     renderEditor()
 
@@ -205,7 +195,7 @@ describe('EnvEditor', () => {
       values: { ODS_MODE: 'local' },
     })
 
-    expect(screen.getByRole('combobox', { name: /ODS Mode/i })).toBeDisabled()
+    expect(screen.getByRole('combobox')).toBeDisabled()
     expect(screen.getByText('read only')).toBeInTheDocument()
     expect(screen.getByText(/selected by the installer/i)).toBeInTheDocument()
   })

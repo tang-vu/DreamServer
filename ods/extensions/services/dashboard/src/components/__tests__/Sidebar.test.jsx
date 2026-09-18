@@ -37,34 +37,35 @@ describe('Sidebar', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
   })
 
-  test('opens profile settings from the workspace footer', () => {
+  test('shows service counts in footer', () => {
     render(<Sidebar status={defaultStatus} collapsed={false} onToggle={() => {}} />)
-    expect(screen.getByText('Your profile')).toBeInTheDocument()
-    expect(screen.getByRole('link',{name:'Edit your profile'})).toHaveAttribute('href','/settings?section=profile')
+    // 2 healthy out of 3 deployed (none are not_deployed)
+    expect(screen.getByText(/Online: 2\/3/)).toBeInTheDocument()
   })
 
-  test('leaves hardware telemetry on the Dashboard', () => {
+  test('shows VRAM bar with usage', () => {
     render(<Sidebar status={defaultStatus} collapsed={false} onToggle={() => {}} />)
-    expect(screen.queryByText('VRAM')).not.toBeInTheDocument()
+    expect(screen.getByText('VRAM')).toBeInTheDocument()
+    expect(screen.getByText('8.0/16 GB')).toBeInTheDocument()
   })
 
   test('hides nav labels when collapsed', () => {
     render(<Sidebar status={defaultStatus} collapsed={true} onToggle={() => {}} />)
-    expect(document.querySelector('aside')).toHaveClass('is-collapsed')
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('title', 'Dashboard')
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
   })
 
   test('uses the compact, accessible navigation treatment below the desktop breakpoint', () => {
     render(<Sidebar status={defaultStatus} collapsed={false} onToggle={() => {}} />)
 
-    expect(document.querySelector('aside')).toHaveClass('pixel-sidebar')
-    expect(screen.getByText('Dashboard').closest('a')).toHaveClass('pixel-nav-item')
-    expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument()
+    expect(document.querySelector('aside')).toHaveClass('w-20', 'sm:w-64')
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveClass('justify-center', 'sm:justify-start')
+    expect(screen.getByText('Dashboard')).toHaveClass('hidden', 'sm:inline')
+    expect(screen.getByRole('button', { name: /collapse sidebar/i })).toHaveClass('hidden', 'sm:flex')
   })
 
-  test('shows version once in the workspace footer', () => {
+  test('shows version in header', () => {
     render(<Sidebar status={defaultStatus} collapsed={false} onToggle={() => {}} />)
-    expect(screen.getAllByText('ODS 1.0.0')).toHaveLength(1)
+    expect(screen.getAllByText(/v1\.0\.0/)).toHaveLength(2)
   })
 
   test('keeps an always-visible OpenCode launcher in the default application list', () => {
@@ -82,7 +83,7 @@ describe('Sidebar', () => {
     render(<Sidebar status={defaultStatus} collapsed={false} onToggle={() => {}} />)
 
     expect(screen.getByText('OpenCode')).toBeInTheDocument()
-    expect(screen.getByText('Offline')).toBeInTheDocument()
+    expect(screen.getByText('OFFLINE')).toBeInTheDocument()
     expect(screen.getByText('OpenCode').closest('a')).not.toHaveAttribute('href')
   })
 })

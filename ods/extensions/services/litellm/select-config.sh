@@ -2,7 +2,7 @@
 set -eu
 
 mode="${ODS_MODE:-local}"
-switchboard="${ODS_MODEL_SWITCHBOARD:-enabled}"
+switchboard="${ODS_MODEL_SWITCHBOARD:-observe}"
 mode_config="${1:-/app/config.yaml}"
 switchboard_config="${2:-/app/switchboard.yaml}"
 

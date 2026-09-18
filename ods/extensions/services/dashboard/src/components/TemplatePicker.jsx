@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import MetalMetricIcon from './MetalMetricIcon'
 import {
   MessageSquare, Image, Code, Shield, Layers, Package,
-  Loader2, X, Check, AlertTriangle, HardDrive, ChevronRight,
-  Code2, MessagesSquare, Server, Network, Microscope, Bot, Blocks, Library, ShieldCheck, Mic,
+  Loader2, X, Check, AlertTriangle, HardDrive,
 } from 'lucide-react'
 
-const ICON_MAP = { MessageSquare, Image, Code, Shield, Layers, Package, Code2, MessagesSquare, Server, Network, Microscope, Bot, Blocks, Library, ShieldCheck, Mic }
+const ICON_MAP = { MessageSquare, Image, Code, Shield, Layers, Package }
 const TEMPLATE_APPLY_TIMEOUT_MS = 30 * 60 * 1000
 
 const fetchJson = async (url, options = {}) => {
@@ -27,14 +25,14 @@ const fetchJson = async (url, options = {}) => {
  * per state and is only clickable in 'available'. Callers that prefer to
  * hide applied templates (Extensions page) can filter them out upstream.
  */
-export function TemplatePicker({ templates, onApplied, compact = false, variant = 'cards' }) {
+export function TemplatePicker({ templates, onApplied, compact = false }) {
   const [preview, setPreview] = useState(null)
 
   if (!templates || templates.length === 0) return null
 
   return (
     <>
-      <div className={variant === 'library' ? 'collection-list' : `grid gap-3 ${compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+      <div className={`grid gap-3 ${compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
         {templates.map(tmpl => {
           const Icon = ICON_MAP[tmpl.icon] || Package
           const status = tmpl._status || 'available'
@@ -42,12 +40,6 @@ export function TemplatePicker({ templates, onApplied, compact = false, variant 
           const hasErrors = status === 'has_errors'
           const isApplied = status === 'applied'
           const disabled = inProgress || hasErrors || isApplied
-
-          if (variant === 'library') return <button key={tmpl.id} className="collection-entry" disabled={disabled} aria-disabled={disabled} onClick={() => setPreview(tmpl)}>
-            <MetalMetricIcon icon={inProgress ? Loader2 : hasErrors ? AlertTriangle : isApplied ? Check : Icon} size={19}/>
-            <span className="collection-copy"><strong>{tmpl.name}</strong><span>{tmpl.description}</span><small>{tmpl.services?.length || 0} services{tmpl.estimated_disk_gb ? ` · ~${tmpl.estimated_disk_gb} GB` : ''}{inProgress ? ' · Installing…' : hasErrors ? ' · Has errors' : isApplied ? ' · Applied' : ''}</small></span>
-            <ChevronRight size={14} aria-hidden="true"/>
-          </button>
 
           const cardBase = 'text-left rounded-xl p-4 transition-all group border'
           const cardByStatus = inProgress

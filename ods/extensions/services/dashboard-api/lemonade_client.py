@@ -124,7 +124,7 @@ class LemonadeClient:
             self._client = None
 
     def api_url(self, path: str) -> str:
-        return f"{self.settings.api_root}/{path.lstrip('/')}"
+        return f"{self.settings.api_root.rstrip('/')}/{path.lstrip('/')}"
 
     def auth_headers(self) -> dict[str, str]:
         if not self.settings.api_key:
@@ -226,27 +226,14 @@ class LemonadeClient:
 
     async def speech(self, model: str, text: str, *, voice: str = "af_heart") -> bytes:
         client = await self._ensure_client()
-        try:
-            response = await client.post(
-                self.api_url("audio/speech"),
-                json={"model": model, "input": text, "voice": voice},
-                headers=self.auth_headers(),
-                timeout=self.settings.timeout,
-            )
-            response.raise_for_status()
-            return response.content
-        except httpx.HTTPStatusError as exc:
-            payload = _json_payload(exc.response)
-            raise LemonadeClientError(
-                classify_status(exc.response.status_code),
-                _payload_message(payload) or exc.response.text or str(exc),
-                status_code=exc.response.status_code,
-                payload=payload,
-            ) from exc
-        except httpx.TimeoutException as exc:
-            raise LemonadeClientError("timeout", str(exc)) from exc
-        except httpx.RequestError as exc:
-            raise LemonadeClientError("provider_unreachable", str(exc)) from exc
+        response = await client.post(
+            self.api_url("audio/speech"),
+            json={"model": model, "input": text, "voice": voice},
+            headers=self.auth_headers(),
+            timeout=self.settings.timeout,
+        )
+        response.raise_for_status()
+        return response.content
 
     async def transcribe_wav(self, model: str, wav_bytes: bytes, *, filename: str = "audio.wav") -> dict[str, Any]:
         client = await self._ensure_client()
